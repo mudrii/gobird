@@ -20,19 +20,17 @@ import (
 
 // extractChrome reads cookies from Chrome's SQLite cookie store on macOS.
 // Cookie values are AES-128-CBC encrypted with a key derived from the macOS Keychain.
-func extractChrome() (*types.TwitterCookies, error) {
+func extractChrome(profileHint string) (*types.TwitterCookies, error) {
 	key, err := chromeCookieKey()
 	if err != nil {
 		return nil, fmt.Errorf("Chrome: keychain key: %w", err)
 	}
 
-	home, _ := os.UserHomeDir()
-	candidates := []string{
-		filepath.Join(home, "Library", "Application Support", "Google", "Chrome", "Default", "Cookies"),
-		filepath.Join(home, "Library", "Application Support", "Google", "Chrome", "Profile 1", "Cookies"),
-		filepath.Join(home, "Library", "Application Support", "Chromium", "Default", "Cookies"),
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("chrome: %w", err)
 	}
-
+	candidates := chromeCookieCandidates(home, profileHint)
 	var dbPath string
 	for _, p := range candidates {
 		if _, err := os.Stat(p); err == nil {
@@ -84,6 +82,28 @@ func extractChrome() (*types.TwitterCookies, error) {
 		Ct0:          ct0,
 		CookieHeader: buildCookieHeader(authToken, ct0),
 	}, nil
+}
+
+func chromeCookieCandidates(home, profileHint string) []string {
+	var candidates []string
+	if profileHint != "" {
+		if strings.HasSuffix(profileHint, ".sqlite") || strings.HasSuffix(profileHint, "Cookies") {
+			candidates = append(candidates, profileHint)
+		} else if strings.HasPrefix(profileHint, "/") {
+			candidates = append(candidates, filepath.Join(profileHint, "Cookies"))
+		} else {
+			candidates = append(candidates,
+				filepath.Join(home, "Library", "Application Support", "Google", "Chrome", profileHint, "Cookies"),
+				filepath.Join(home, "Library", "Application Support", "Chromium", profileHint, "Cookies"),
+			)
+		}
+	}
+	candidates = append(candidates,
+		filepath.Join(home, "Library", "Application Support", "Google", "Chrome", "Default", "Cookies"),
+		filepath.Join(home, "Library", "Application Support", "Google", "Chrome", "Profile 1", "Cookies"),
+		filepath.Join(home, "Library", "Application Support", "Chromium", "Default", "Cookies"),
+	)
+	return candidates
 }
 
 // chromeCookieKey retrieves the AES key from the macOS Keychain.

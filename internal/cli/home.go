@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/mudrii/gobird/internal/client"
@@ -13,12 +11,7 @@ import (
 )
 
 func quickClient() (*client.Client, error) {
-	authToken := os.Getenv("AUTH_TOKEN")
-	ct0 := os.Getenv("CT0")
-	if authToken == "" || ct0 == "" {
-		return nil, fmt.Errorf("AUTH_TOKEN and CT0 must be set")
-	}
-	return client.New(authToken, ct0, nil), nil
+	return resolveClient()
 }
 
 func newHomeCmd() *cobra.Command {
@@ -35,21 +28,20 @@ func newHomeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
-			opts := &types.FetchOptions{Limit: limit}
+			opts := &types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()}
 			var result types.TweetResult
 			if latest {
-				result = c.GetHomeLatestTimeline(ctx, opts)
+				result = c.GetHomeLatestTimeline(cmd.Context(), opts)
 			} else {
-				result = c.GetHomeTimeline(ctx, opts)
+				result = c.GetHomeTimeline(cmd.Context(), opts)
 			}
 			if result.Error != nil {
 				return result.Error
 			}
-			if asJSON {
+			if asJSON || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
-			fmtOpts := output.FormatOptions{}
+			fmtOpts := currentFormatOptions()
 			for _, t := range result.Items {
 				fmt.Fprintln(cmd.OutOrStdout(), output.FormatTweet(t, fmtOpts))
 			}

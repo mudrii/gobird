@@ -40,7 +40,7 @@ func isSearchQueryIDMismatch(errs []graphqlError) bool {
 
 // searchPage fetches a single page of search results for the given query, cursor,
 // and query ID.
-func (c *Client) searchPage(ctx context.Context, queryID, q, cursor string, count int, product string) inlinePageResult {
+func (c *Client) searchPage(ctx context.Context, queryID, q, cursor string, count int, product string, quoteDepth int, includeRaw bool) inlinePageResult {
 	vars := map[string]any{
 		"rawQuery":    q,
 		"count":       count,
@@ -100,7 +100,10 @@ func (c *Client) searchPage(ctx context.Context, queryID, q, cursor string, coun
 	}
 
 	instructions := resp.Data.SearchByRawQuery.SearchTimeline.Timeline.Instructions
-	tweets := parsing.ParseTweetsFromInstructions(instructions)
+	tweets := parsing.ParseTweetsFromInstructionsWithOptions(instructions, parsing.TweetParseOptions{QuoteDepth: quoteDepth})
+	if includeRaw {
+		tweets = attachRawToTweets(tweets, raw)
+	}
 	nextCursor := parsing.ExtractCursorFromInstructions(instructions)
 
 	return inlinePageResult{
@@ -133,8 +136,9 @@ func (c *Client) Search(ctx context.Context, q string, opts *types.SearchOptions
 	refreshed := false
 
 	for attempt := 0; attempt < 2; attempt++ {
+		retryWithRefreshedIDs := false
 		for _, qid := range queryIDs {
-			result := c.searchPage(ctx, qid, q, cursor, count, product)
+			result := c.searchPage(ctx, qid, q, cursor, count, product, opts.QuoteDepth, opts.IncludeRaw)
 			if result.success {
 				return types.TweetPage{
 					Items:      result.tweets,
@@ -161,6 +165,7 @@ func (c *Client) Search(ctx context.Context, q string, opts *types.SearchOptions
 				refreshed = true
 				c.refreshQueryIDs(ctx)
 				queryIDs = c.getQueryIDs("SearchTimeline")
+				retryWithRefreshedIDs = true
 				break
 			}
 
@@ -168,10 +173,11 @@ func (c *Client) Search(ctx context.Context, q string, opts *types.SearchOptions
 				refreshed = true
 				c.refreshQueryIDs(ctx)
 				queryIDs = c.getQueryIDs("SearchTimeline")
+				retryWithRefreshedIDs = true
 				break
 			}
 		}
-		if attempt > 0 || (!refreshed) {
+		if !retryWithRefreshedIDs {
 			break
 		}
 	}
@@ -203,38 +209,42 @@ func (c *Client) GetAllSearchResults(ctx context.Context, q string, opts *types.
 
 	fetchFn := func(ctx context.Context, cursor string) inlinePageResult {
 		var lastErr error
-		currentIDs := queryIDs
+		for {
+			refreshedThisRound := false
+			for _, qid := range queryIDs {
+				result := c.searchPage(ctx, qid, q, cursor, count, product, opts.QuoteDepth, opts.IncludeRaw)
+				if result.success {
+					return result
+				}
+				lastErr = result.err
 
-		for _, qid := range currentIDs {
-			result := c.searchPage(ctx, qid, q, cursor, count, product)
-			if result.success {
-				return result
-			}
-			lastErr = result.err
-
-			shouldRefresh := false
-			if he, ok := lastErr.(*httpError); ok {
-				if (he.StatusCode == 400 || he.StatusCode == 422) &&
-					strings.Contains(he.Body, "GRAPHQL_VALIDATION_FAILED") {
+				shouldRefresh := false
+				if he, ok := lastErr.(*httpError); ok {
+					if (he.StatusCode == 400 || he.StatusCode == 422) &&
+						strings.Contains(he.Body, "GRAPHQL_VALIDATION_FAILED") {
+						shouldRefresh = true
+					}
+				}
+				if !shouldRefresh && lastErr != nil &&
+					strings.Contains(lastErr.Error(), "GRAPHQL_VALIDATION_FAILED") {
 					shouldRefresh = true
 				}
-			}
-			if !shouldRefresh && lastErr != nil &&
-				strings.Contains(lastErr.Error(), "GRAPHQL_VALIDATION_FAILED") {
-				shouldRefresh = true
-			}
-			if is404(lastErr) {
-				shouldRefresh = true
-			}
+				if is404(lastErr) {
+					shouldRefresh = true
+				}
 
-			if shouldRefresh && !refreshed {
-				refreshed = true
-				c.refreshQueryIDs(ctx)
-				queryIDs = c.getQueryIDs("SearchTimeline")
-				currentIDs = queryIDs
+				if shouldRefresh && !refreshed {
+					refreshed = true
+					refreshedThisRound = true
+					c.refreshQueryIDs(ctx)
+					queryIDs = c.getQueryIDs("SearchTimeline")
+					break
+				}
+			}
+			if !refreshedThisRound {
+				return inlinePageResult{success: false, err: lastErr}
 			}
 		}
-		return inlinePageResult{success: false, err: lastErr}
 	}
 
 	return paginateInline(ctx, opts.FetchOptions, 1000, fetchFn)

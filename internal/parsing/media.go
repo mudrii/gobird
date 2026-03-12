@@ -29,7 +29,7 @@ func ExtractMedia(entities *types.WireMediaEntities) []types.TweetMedia {
 
 		// PreviewURL for ANY media with sizes.small (correction #31).
 		if m.Sizes.Small != nil {
-			tm.PreviewURL = m.MediaURLHttps
+			tm.PreviewURL = m.MediaURLHttps + ":small"
 		}
 
 		// Video URL from variants.

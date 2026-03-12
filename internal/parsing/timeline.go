@@ -22,8 +22,8 @@ func CollectTweetResultsFromEntry(entry *types.WireEntry) []*types.WireRawTweet 
 
 	// Path 2: items[].item.itemContent.tweet_results.result (module timeline)
 	for _, item := range c.Items {
-		if item.Item.TweetResult != nil {
-			if r := item.Item.TweetResult.Result; r != nil {
+		if item.Item.ItemContent != nil && item.Item.ItemContent.TweetResult != nil {
+			if r := item.Item.ItemContent.TweetResult.Result; r != nil {
 				results = append(results, r)
 			}
 		}
@@ -38,6 +38,12 @@ func CollectTweetResultsFromEntry(entry *types.WireEntry) []*types.WireRawTweet 
 // ParseTweetsFromInstructions collects and normalizes all tweet results
 // from a slice of timeline instructions.
 func ParseTweetsFromInstructions(instructions []types.WireTimelineInstruction) []types.TweetData {
+	return ParseTweetsFromInstructionsWithOptions(instructions, TweetParseOptions{QuoteDepth: 1})
+}
+
+// ParseTweetsFromInstructionsWithOptions collects and normalizes all tweet
+// results from a slice of timeline instructions.
+func ParseTweetsFromInstructionsWithOptions(instructions []types.WireTimelineInstruction, opts TweetParseOptions) []types.TweetData {
 	var tweets []types.TweetData
 	seen := map[string]bool{}
 	for _, inst := range instructions {
@@ -51,7 +57,7 @@ func ParseTweetsFromInstructions(instructions []types.WireTimelineInstruction) [
 					continue
 				}
 				seen[unwrapped.RestID] = true
-				if td := MapTweetResult(unwrapped); td != nil {
+				if td := MapTweetResultWithOptions(unwrapped, opts); td != nil {
 					tweets = append(tweets, *td)
 				}
 			}

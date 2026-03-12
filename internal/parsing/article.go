@@ -3,6 +3,7 @@ package parsing
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	"github.com/mudrii/gobird/internal/types"
 )
@@ -15,10 +16,20 @@ func ExtractArticleText(result *types.WireArticleResult) string {
 	}
 	if result.ContentState != "" {
 		if text := renderContentState(result.ContentState); text != "" {
+			if result.Title != "" && text != result.Title {
+				return result.Title + "\n\n" + text
+			}
 			return text
 		}
 	}
-	return result.PreviewText
+	switch {
+	case result.Title != "" && result.PreviewText != "" && result.PreviewText != result.Title:
+		return result.Title + "\n\n" + result.PreviewText
+	case result.PreviewText != "":
+		return result.PreviewText
+	default:
+		return result.Title
+	}
 }
 
 // draftJSContentState is the shape of a Draft.js content state JSON blob.
@@ -51,18 +62,17 @@ func renderContentState(contentStateJSON string) string {
 	if err := json.Unmarshal([]byte(contentStateJSON), &cs); err != nil {
 		return ""
 	}
-	result := ""
-	for i, block := range cs.Blocks {
-		if i > 0 {
-			result += "\n"
-		}
+	var blocks []string
+	for _, block := range cs.Blocks {
+		var rendered string
 		if block.Type == "atomic" {
-			result += renderAtomicBlock(block, cs.EntityMap)
+			rendered = renderAtomicBlock(block, cs.EntityMap)
 		} else {
-			result += block.Text
+			rendered = renderBlockText(block, cs.EntityMap)
 		}
+		blocks = append(blocks, rendered)
 	}
-	return result
+	return strings.Join(blocks, "\n\n")
 }
 
 // renderAtomicBlock renders an atomic Draft.js block using its entity map entry.
@@ -83,6 +93,46 @@ func renderAtomicBlock(block draftBlock, entityMap map[string]draftEntity) strin
 	case "IMAGE", "MEDIA":
 		if src, ok := entity.Data["src"].(string); ok {
 			return src
+		}
+	case "DIVIDER":
+		return "---"
+	case "TWEET":
+		if url, ok := entity.Data["url"].(string); ok {
+			return url
+		}
+		if id, ok := entity.Data["id"].(string); ok {
+			return "https://twitter.com/i/status/" + id
+		}
+	case "MARKDOWN":
+		if src, ok := entity.Data["src"].(string); ok {
+			return src
+		}
+		if content, ok := entity.Data["content"].(string); ok {
+			return content
+		}
+	}
+	return block.Text
+}
+
+// renderBlockText renders a non-atomic block's text with inline entity ranges applied.
+func renderBlockText(block draftBlock, entityMap map[string]draftEntity) string {
+	if len(block.EntityRanges) == 0 {
+		return block.Text
+	}
+	runes := []rune(block.Text)
+	// For each entity range that is a LINK, we could annotate the text,
+	// but for plain-text output we just return the raw text as-is.
+	// If any range covers the full text and is a LINK, return the URL instead.
+	for _, er := range block.EntityRanges {
+		keyStr := entityKeyToString(er.Key)
+		entity, ok := entityMap[keyStr]
+		if !ok {
+			continue
+		}
+		if entity.Type == "LINK" && er.Offset == 0 && er.Length == len(runes) {
+			if url, ok := entity.Data["url"].(string); ok {
+				return url
+			}
 		}
 	}
 	return block.Text

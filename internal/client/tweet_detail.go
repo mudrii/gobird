@@ -20,14 +20,14 @@ func (c *Client) getTweetDetailQueryIDs() []string {
 // Correction #28: no referrer, no count. cursor only when paginating.
 func buildTweetDetailVars(focalTweetID string, cursor string) map[string]any {
 	vars := map[string]any{
-		"focalTweetId":                             focalTweetID,
-		"with_rux_injections":                      false,
-		"rankingMode":                              "Relevance",
-		"includePromotedContent":                   true,
-		"withCommunity":                            true,
-		"withQuickPromoteEligibilityTweetFields":   true,
-		"withBirdwatchNotes":                       true,
-		"withVoice":                                true,
+		"focalTweetId":                           focalTweetID,
+		"with_rux_injections":                    false,
+		"rankingMode":                            "Relevance",
+		"includePromotedContent":                 true,
+		"withCommunity":                          true,
+		"withQuickPromoteEligibilityTweetFields": true,
+		"withBirdwatchNotes":                     true,
+		"withVoice":                              true,
 	}
 	if cursor != "" {
 		vars["cursor"] = cursor
@@ -56,8 +56,9 @@ func (c *Client) fetchTweetDetail(ctx context.Context, focalTweetID string, curs
 	featuresJSON, _ := json.Marshal(features)
 	togglesJSON, _ := json.Marshal(fieldToggles)
 
-	tryQueryIDs := func(queryIDs []string) ([]byte, bool) {
+	tryQueryIDs := func(queryIDs []string) ([]byte, error, bool) {
 		had404 := false
+		var lastErr error
 		for _, queryID := range queryIDs {
 			getURL := fmt.Sprintf("%s/%s/TweetDetail?variables=%s&features=%s&fieldToggles=%s",
 				GraphQLBaseURL, queryID,
@@ -67,11 +68,13 @@ func (c *Client) fetchTweetDetail(ctx context.Context, focalTweetID string, curs
 			)
 			body, err := c.doGET(ctx, getURL, c.getJsonHeaders())
 			if err == nil {
-				return body, false
+				return body, nil, false
 			}
 			if !is404(err) {
+				lastErr = err
 				continue
 			}
+			had404 = true
 			// GET returned 404 → try POST.
 			postURL := fmt.Sprintf("%s/%s/TweetDetail", GraphQLBaseURL, queryID)
 			postBody := map[string]any{
@@ -81,26 +84,30 @@ func (c *Client) fetchTweetDetail(ctx context.Context, focalTweetID string, curs
 			}
 			body, postErr := c.doPOSTJSON(ctx, postURL, c.getJsonHeaders(), postBody)
 			if postErr == nil {
-				return body, false
+				return body, nil, false
 			}
+			lastErr = postErr
 			if is404(postErr) {
-				had404 = true
+				continue
 			}
 		}
-		return nil, had404
+		return nil, lastErr, had404
 	}
 
 	queryIDs := c.getTweetDetailQueryIDs()
-	body, had404 := tryQueryIDs(queryIDs)
+	body, lastErr, had404 := tryQueryIDs(queryIDs)
 	if body != nil {
 		return body, nil
 	}
 	if had404 {
 		c.refreshQueryIDs(ctx)
-		body, _ = tryQueryIDs(c.getTweetDetailQueryIDs())
+		body, lastErr, _ = tryQueryIDs(c.getTweetDetailQueryIDs())
 		if body != nil {
 			return body, nil
 		}
+	}
+	if lastErr != nil {
+		return nil, lastErr
 	}
 	return nil, fmt.Errorf("TweetDetail failed for tweet %q", focalTweetID)
 }
@@ -127,7 +134,7 @@ func (c *Client) GetTweet(ctx context.Context, tweetID string, opts *types.Tweet
 		return nil, fmt.Errorf("tweet %q not found", tweetID)
 	}
 	raw := parsing.UnwrapTweetResult(env.Data.TweetResult.Result)
-	td := parsing.MapTweetResult(raw)
+	td := parsing.MapTweetResultWithOptions(raw, parsing.TweetParseOptions{QuoteDepth: opts.QuoteDepth})
 	if td == nil {
 		return nil, fmt.Errorf("could not map tweet %q", tweetID)
 	}
@@ -201,7 +208,7 @@ func (c *Client) paginateCursor(ctx context.Context, tweetID string, opts *types
 		}
 
 		// Step 2: fetch page.
-		page, err := c.fetchThreadPage(ctx, tweetID, cursor)
+		page, err := c.fetchThreadPage(ctx, tweetID, cursor, opts.QuoteDepth, opts.IncludeRaw)
 
 		// Step 3: handle failure.
 		if err != nil {
@@ -246,16 +253,16 @@ func (c *Client) paginateCursor(ctx context.Context, tweetID string, opts *types
 }
 
 // fetchThreadPage fetches a single page from TweetDetail for thread/replies.
-func (c *Client) fetchThreadPage(ctx context.Context, tweetID string, cursor string) (*types.TweetPage, error) {
+func (c *Client) fetchThreadPage(ctx context.Context, tweetID string, cursor string, quoteDepth int, includeRaw bool) (*types.TweetPage, error) {
 	body, err := c.fetchTweetDetail(ctx, tweetID, cursor)
 	if err != nil {
 		return nil, err
 	}
-	return parseThreadedConversationResponse(body)
+	return parseThreadedConversationResponse(body, quoteDepth, includeRaw)
 }
 
 // parseThreadedConversationResponse parses the threaded_conversation response.
-func parseThreadedConversationResponse(body []byte) (*types.TweetPage, error) {
+func parseThreadedConversationResponse(body []byte, quoteDepth int, includeRaw bool) (*types.TweetPage, error) {
 	var env struct {
 		Data struct {
 			ThreadedConversationWithInjectionsV2 struct {
@@ -267,7 +274,10 @@ func parseThreadedConversationResponse(body []byte) (*types.TweetPage, error) {
 		return nil, err
 	}
 	instructions := env.Data.ThreadedConversationWithInjectionsV2.Instructions
-	tweets := parsing.ParseTweetsFromInstructions(instructions)
+	tweets := parsing.ParseTweetsFromInstructionsWithOptions(instructions, parsing.TweetParseOptions{QuoteDepth: quoteDepth})
+	if includeRaw {
+		tweets = attachRawToTweets(tweets, body)
+	}
 	cursor := parsing.ExtractCursorFromInstructions(instructions)
 	return &types.TweetPage{
 		Items:      tweets,

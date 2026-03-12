@@ -24,8 +24,9 @@ func newSearchCmd() *cobra.Command {
 
 			opts := &types.SearchOptions{
 				FetchOptions: types.FetchOptions{
-					Limit:    globalFlags.limit,
-					MaxPages: globalFlags.maxPages,
+					Limit:      globalFlags.limit,
+					MaxPages:   globalFlags.maxPages,
+					QuoteDepth: resolveQuoteDepthFromCommand(),
 					IncludeRaw: globalFlags.jsonFull,
 				},
 			}
@@ -75,8 +76,9 @@ func newMentionsCmd() *cobra.Command {
 
 			opts := &types.SearchOptions{
 				FetchOptions: types.FetchOptions{
-					Limit:    globalFlags.limit,
-					MaxPages: globalFlags.maxPages,
+					Limit:      globalFlags.limit,
+					MaxPages:   globalFlags.maxPages,
+					QuoteDepth: resolveQuoteDepthFromCommand(),
 					IncludeRaw: globalFlags.jsonFull,
 				},
 			}

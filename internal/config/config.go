@@ -5,9 +5,33 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/tailscale/hujson"
 )
+
+// StringOrSlice decodes either a JSON string or string array into a slice.
+type StringOrSlice []string
+
+// UnmarshalJSON accepts `"value"` or `["value"]`.
+func (s *StringOrSlice) UnmarshalJSON(data []byte) error {
+	var single string
+	if err := json.Unmarshal(data, &single); err == nil {
+		if single == "" {
+			*s = nil
+		} else {
+			*s = []string{single}
+		}
+		return nil
+	}
+
+	var many []string
+	if err := json.Unmarshal(data, &many); err != nil {
+		return err
+	}
+	*s = many
+	return nil
+}
 
 // Config holds all configurable bird settings.
 type Config struct {
@@ -17,48 +41,71 @@ type Config struct {
 	Ct0 string `json:"ct0"`
 	// DefaultBrowser selects which browser to extract cookies from ("safari", "chrome", "firefox").
 	DefaultBrowser string `json:"defaultBrowser"`
+	// ChromeProfile selects the Chrome profile name for cookie extraction.
+	ChromeProfile string `json:"chromeProfile"`
+	// ChromeProfileDir selects the Chrome/Chromium profile directory or cookie DB path.
+	ChromeProfileDir string `json:"chromeProfileDir"`
+	// FirefoxProfile selects the Firefox profile name for cookie extraction.
+	FirefoxProfile string `json:"firefoxProfile"`
+	// CookieSource controls browser cookie source order.
+	CookieSource StringOrSlice `json:"cookieSource"`
+	// CookieTimeoutMs controls browser cookie extraction timeout.
+	CookieTimeoutMs int `json:"cookieTimeoutMs"`
+	// TimeoutMs controls HTTP request timeout.
+	TimeoutMs int `json:"timeoutMs"`
+	// QuoteDepth controls quoted tweet expansion depth.
+	QuoteDepth int `json:"quoteDepth"`
 	// QueryIDCachePath overrides the default query ID cache file location.
 	QueryIDCachePath string `json:"queryIdCachePath"`
 	// FeatureOverridesPath overrides the default features JSON path.
 	FeatureOverridesPath string `json:"featureOverridesPath"`
 }
 
-// Load reads and parses the bird config file, applying env var overrides.
-// Searches in order: explicit path → $BIRD_CONFIG → ~/.config/bird/config.json5 → ~/.bird.json5.
-// Returns an empty Config (not an error) when no file is found.
+// Load reads and parses the bird config files, applying env var overrides.
+// Order: explicit path or $BIRD_CONFIG; otherwise global ~/.config/bird/config.json5
+// followed by local ./.birdrc.json5, with local overriding global.
 func Load(explicitPath string) (*Config, error) {
-	path := resolvePath(explicitPath)
 	cfg := &Config{}
-	if path != "" {
+	if path := explicitOrEnvPath(explicitPath); path != "" {
 		if err := loadFile(path, cfg); err != nil {
 			return nil, err
+		}
+	} else {
+		for _, path := range defaultConfigPaths() {
+			if path == "" {
+				continue
+			}
+			if _, err := os.Stat(path); err == nil {
+				if err := loadFile(path, cfg); err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
 	applyEnv(cfg)
 	return cfg, nil
 }
 
-func resolvePath(explicit string) string {
+func explicitOrEnvPath(explicit string) string {
 	if explicit != "" {
 		return explicit
 	}
 	if v := os.Getenv("BIRD_CONFIG"); v != "" {
 		return v
 	}
+	return ""
+}
+
+func defaultConfigPaths() []string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ""
+		return nil
 	}
-	candidates := []string{
+	cwd, _ := os.Getwd()
+	return []string{
 		filepath.Join(home, ".config", "bird", "config.json5"),
-		filepath.Join(home, ".bird.json5"),
+		filepath.Join(cwd, ".birdrc.json5"),
 	}
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return ""
 }
 
 func loadFile(path string, cfg *Config) error {
@@ -88,5 +135,20 @@ func applyEnv(cfg *Config) {
 		cfg.Ct0 = v
 	} else if v := os.Getenv("TWITTER_CT0"); v != "" {
 		cfg.Ct0 = v
+	}
+	if v := os.Getenv("BIRD_TIMEOUT_MS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.TimeoutMs = n
+		}
+	}
+	if v := os.Getenv("BIRD_COOKIE_TIMEOUT_MS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.CookieTimeoutMs = n
+		}
+	}
+	if v := os.Getenv("BIRD_QUOTE_DEPTH"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.QuoteDepth = n
+		}
 	}
 }

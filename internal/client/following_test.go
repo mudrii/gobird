@@ -128,7 +128,7 @@ func TestGetFollowing_404TriggersRefresh(t *testing.T) {
 }
 
 func TestParseFollowResponse(t *testing.T) {
-	page, err := parseFollowResponse([]byte(followingGraphQLJSON))
+	page, err := parseFollowResponse([]byte(followingGraphQLJSON), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestParseRESTFollowResponse(t *testing.T) {
 		],
 		"next_cursor_str": "0"
 	}`
-	page, err := parseRESTFollowResponse([]byte(restJSON))
+	page, err := parseRESTFollowResponse([]byte(restJSON), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestParseRESTFollowResponse_WithNextCursor(t *testing.T) {
 		"users": [{"id_str": "400", "screen_name": "u400"}],
 		"next_cursor_str": "12345"
 	}`
-	page, err := parseRESTFollowResponse([]byte(restJSON))
+	page, err := parseRESTFollowResponse([]byte(restJSON), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

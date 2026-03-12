@@ -14,7 +14,7 @@ import (
 // bookmarkPage fetches a single page of bookmarks using fetchWithRetry.
 // Correction #85: variables are built once outside the per-queryId loop (cursor baked in).
 // Correction #16: fetchWithRetry with maxRetries=2, baseDelayMs=500.
-func (c *Client) bookmarkPage(ctx context.Context, queryID string, varsJSON, featJSON []byte) inlinePageResult {
+func (c *Client) bookmarkPage(ctx context.Context, queryID string, varsJSON, featJSON []byte, quoteDepth int, includeRaw bool) inlinePageResult {
 	endpoint := graphqlURL("Bookmarks", queryID)
 	u, err := url.Parse(endpoint)
 	if err != nil {
@@ -45,7 +45,10 @@ func (c *Client) bookmarkPage(ctx context.Context, queryID string, varsJSON, fea
 	}
 
 	instructions := resp.Data.BookmarkTimelineV2.Timeline.Instructions
-	tweets := parsing.ParseTweetsFromInstructions(instructions)
+	tweets := parsing.ParseTweetsFromInstructionsWithOptions(instructions, parsing.TweetParseOptions{QuoteDepth: quoteDepth})
+	if includeRaw {
+		tweets = attachRawToTweets(tweets, raw)
+	}
 	nextCursor := parsing.ExtractCursorFromInstructions(instructions)
 
 	return inlinePageResult{
@@ -93,23 +96,28 @@ func (c *Client) GetBookmarks(ctx context.Context, opts *types.FetchOptions) typ
 			return inlinePageResult{success: false, err: err}
 		}
 
-		currentIDs := queryIDs
 		var lastErr error
-		for _, qid := range currentIDs {
-			result := c.bookmarkPage(ctx, qid, varsJSON, featJSON)
-			if result.success {
-				return result
-			}
-			lastErr = result.err
+		for {
+			refreshedThisRound := false
+			for _, qid := range queryIDs {
+				result := c.bookmarkPage(ctx, qid, varsJSON, featJSON, opts.QuoteDepth, opts.IncludeRaw)
+				if result.success {
+					return result
+				}
+				lastErr = result.err
 
-			if is404(lastErr) && !refreshed {
-				refreshed = true
-				c.refreshQueryIDs(ctx)
-				queryIDs = c.getQueryIDs("Bookmarks")
-				currentIDs = queryIDs
+				if is404(lastErr) && !refreshed {
+					refreshed = true
+					refreshedThisRound = true
+					c.refreshQueryIDs(ctx)
+					queryIDs = c.getQueryIDs("Bookmarks")
+					break
+				}
+			}
+			if !refreshedThisRound {
+				return inlinePageResult{success: false, err: lastErr}
 			}
 		}
-		return inlinePageResult{success: false, err: lastErr}
 	}
 
 	return paginateInline(ctx, *opts, 0, fetchFn)
@@ -119,7 +127,7 @@ func (c *Client) GetBookmarks(ctx context.Context, opts *types.FetchOptions) typ
 // Correction #11: retries without count on "Variable "$count"" error.
 // Correction #23: returns error immediately on "Variable "$cursor"" error.
 // Correction #75: uses fetchWithRetry.
-func (c *Client) bookmarkFolderPage(ctx context.Context, queryID, folderID, cursor string, count int, includeCount bool) inlinePageResult {
+func (c *Client) bookmarkFolderPage(ctx context.Context, queryID, folderID, cursor string, count int, includeCount bool, quoteDepth int, includeRaw bool) inlinePageResult {
 	vars := map[string]any{
 		"bookmark_collection_id": folderID,
 		"includePromotedContent": true,
@@ -161,7 +169,7 @@ func (c *Client) bookmarkFolderPage(ctx context.Context, queryID, folderID, curs
 		if strings.Contains(e.Message, `Variable "$count"`) {
 			// Retry without count (correction #11).
 			if includeCount {
-				return c.bookmarkFolderPage(ctx, queryID, folderID, cursor, count, false)
+				return c.bookmarkFolderPage(ctx, queryID, folderID, cursor, count, false, quoteDepth, includeRaw)
 			}
 		}
 		if strings.Contains(e.Message, `Variable "$cursor"`) && cursor != "" {
@@ -188,7 +196,10 @@ func (c *Client) bookmarkFolderPage(ctx context.Context, queryID, folderID, curs
 	}
 
 	instructions := resp.Data.BookmarkCollectionTimeline.Timeline.Instructions
-	tweets := parsing.ParseTweetsFromInstructions(instructions)
+	tweets := parsing.ParseTweetsFromInstructionsWithOptions(instructions, parsing.TweetParseOptions{QuoteDepth: quoteDepth})
+	if includeRaw {
+		tweets = attachRawToTweets(tweets, raw)
+	}
 	nextCursor := parsing.ExtractCursorFromInstructions(instructions)
 
 	return inlinePageResult{
@@ -216,35 +227,40 @@ func (c *Client) GetBookmarkFolderTimeline(ctx context.Context, opts *types.Book
 	refreshed := false
 
 	fetchFn := func(ctx context.Context, cursor string) inlinePageResult {
-		currentIDs := queryIDs
 		var lastErr error
-		for _, qid := range currentIDs {
-			result := c.bookmarkFolderPage(ctx, qid, folderID, cursor, count, true)
-			if result.success {
-				return result
-			}
-			lastErr = result.err
+		for {
+			refreshedThisRound := false
+			for _, qid := range queryIDs {
+				result := c.bookmarkFolderPage(ctx, qid, folderID, cursor, count, true, opts.QuoteDepth, opts.IncludeRaw)
+				if result.success {
+					return result
+				}
+				lastErr = result.err
 
-			// Stop immediately on cursor rejection (correction #23).
-			if lastErr != nil && strings.Contains(lastErr.Error(), "bookmark folder pagination rejected the cursor parameter") {
+				// Stop immediately on cursor rejection (correction #23).
+				if lastErr != nil && strings.Contains(lastErr.Error(), "bookmark folder pagination rejected the cursor parameter") {
+					return inlinePageResult{success: false, err: lastErr}
+				}
+
+				if is404(lastErr) && !refreshed {
+					refreshed = true
+					refreshedThisRound = true
+					c.refreshQueryIDs(ctx)
+					queryIDs = c.getQueryIDs("BookmarkFolderTimeline")
+					break
+				}
+			}
+			if !refreshedThisRound {
 				return inlinePageResult{success: false, err: lastErr}
 			}
-
-			if is404(lastErr) && !refreshed {
-				refreshed = true
-				c.refreshQueryIDs(ctx)
-				queryIDs = c.getQueryIDs("BookmarkFolderTimeline")
-				currentIDs = queryIDs
-			}
 		}
-		return inlinePageResult{success: false, err: lastErr}
 	}
 
 	return paginateInline(ctx, opts.FetchOptions, 0, fetchFn)
 }
 
 // likesPage fetches a single page of liked tweets for the authenticated user.
-func (c *Client) likesPage(ctx context.Context, queryID, userID, cursor string, count int) inlinePageResult {
+func (c *Client) likesPage(ctx context.Context, queryID, userID, cursor string, count int, quoteDepth int, includeRaw bool) inlinePageResult {
 	// Correction #29: no withV2Timeline field.
 	vars := map[string]any{
 		"userId":                 userID,
@@ -302,7 +318,10 @@ func (c *Client) likesPage(ctx context.Context, queryID, userID, cursor string, 
 	}
 
 	instructions := resp.Data.User.Result.Timeline.Timeline.Instructions
-	tweets := parsing.ParseTweetsFromInstructions(instructions)
+	tweets := parsing.ParseTweetsFromInstructionsWithOptions(instructions, parsing.TweetParseOptions{QuoteDepth: quoteDepth})
+	if includeRaw {
+		tweets = attachRawToTweets(tweets, raw)
+	}
 	nextCursor := parsing.ExtractCursorFromInstructions(instructions)
 
 	return inlinePageResult{
@@ -325,39 +344,45 @@ func (c *Client) GetLikes(ctx context.Context, opts *types.FetchOptions) types.T
 		count = 20
 	}
 
-	userID, err := c.ensureClientUserID(ctx)
-	if err != nil {
+	if err := c.ensureClientUserID(ctx); err != nil {
 		return types.TweetResult{Success: false, Error: err}
 	}
+	userID := c.userID
 
 	queryIDs := c.getQueryIDs("Likes")
 	refreshed := false
 
 	fetchFn := func(ctx context.Context, cursor string) inlinePageResult {
-		currentIDs := queryIDs
 		var lastErr error
 		var accumulatedErrMsg string
 
-		for _, qid := range currentIDs {
-			result := c.likesPage(ctx, qid, userID, cursor, count)
-			if result.success {
-				return result
-			}
-			lastErr = result.err
-			if lastErr != nil {
-				accumulatedErrMsg += lastErr.Error()
-			}
+		for {
+			refreshedThisRound := false
+			for _, qid := range queryIDs {
+				result := c.likesPage(ctx, qid, userID, cursor, count, opts.QuoteDepth, opts.IncludeRaw)
+				if result.success {
+					return result
+				}
+				lastErr = result.err
+				if lastErr != nil {
+					accumulatedErrMsg += lastErr.Error()
+				}
 
-			// Correction #51: "Query: Unspecified" (exact case) — continue to next ID.
-			if lastErr != nil && strings.Contains(lastErr.Error(), "Query: Unspecified") {
-				continue
-			}
+				// Correction #51: "Query: Unspecified" (exact case) — continue to next ID.
+				if lastErr != nil && strings.Contains(lastErr.Error(), "Query: Unspecified") {
+					continue
+				}
 
-			if is404(lastErr) && !refreshed {
-				refreshed = true
-				c.refreshQueryIDs(ctx)
-				queryIDs = c.getQueryIDs("Likes")
-				currentIDs = queryIDs
+				if is404(lastErr) && !refreshed {
+					refreshed = true
+					refreshedThisRound = true
+					c.refreshQueryIDs(ctx)
+					queryIDs = c.getQueryIDs("Likes")
+					break
+				}
+			}
+			if !refreshedThisRound {
+				break
 			}
 		}
 
@@ -366,10 +391,8 @@ func (c *Client) GetLikes(ctx context.Context, opts *types.FetchOptions) types.T
 		if strings.Contains(accumulatedErrMsg, "Query: Unspecified") && !refreshed {
 			refreshed = true
 			c.refreshQueryIDs(ctx)
-			queryIDs = c.getQueryIDs("Likes")
-			currentIDs = queryIDs
-			for _, qid := range currentIDs {
-				result := c.likesPage(ctx, qid, userID, cursor, count)
+			for _, qid := range c.getQueryIDs("Likes") {
+				result := c.likesPage(ctx, qid, userID, cursor, count, opts.QuoteDepth, opts.IncludeRaw)
 				if result.success {
 					return result
 				}

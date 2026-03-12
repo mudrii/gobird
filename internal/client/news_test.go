@@ -142,7 +142,7 @@ func TestMapNewsItem_FallbackID(t *testing.T) {
 }
 
 func TestParseGenericTimelineResponse(t *testing.T) {
-	items, err := parseGenericTimelineResponse([]byte(genericTimelineTweetsJSON))
+	items, err := parseGenericTimelineResponse([]byte(genericTimelineTweetsJSON), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

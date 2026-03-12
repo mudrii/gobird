@@ -10,18 +10,28 @@ import (
 
 // Tweet posts a new tweet with the given text and returns the tweet ID.
 func (c *Client) Tweet(ctx context.Context, text string) (string, error) {
-	return c.createTweet(ctx, text, "")
+	return c.createTweet(ctx, text, "", nil)
 }
 
 // Reply posts a reply to the given tweet ID and returns the new tweet ID.
 func (c *Client) Reply(ctx context.Context, text, inReplyToID string) (string, error) {
-	return c.createTweet(ctx, text, inReplyToID)
+	return c.createTweet(ctx, text, inReplyToID, nil)
+}
+
+// TweetWithMedia posts a new tweet with uploaded media IDs attached.
+func (c *Client) TweetWithMedia(ctx context.Context, text string, mediaIDs []string) (string, error) {
+	return c.createTweet(ctx, text, "", mediaIDs)
+}
+
+// ReplyWithMedia posts a reply with uploaded media IDs attached.
+func (c *Client) ReplyWithMedia(ctx context.Context, text, inReplyToID string, mediaIDs []string) (string, error) {
+	return c.createTweet(ctx, text, inReplyToID, mediaIDs)
 }
 
 // createTweet implements the CreateTweet fallback chain (corrections #39, #72).
-func (c *Client) createTweet(ctx context.Context, text, inReplyToID string) (string, error) {
+func (c *Client) createTweet(ctx context.Context, text, inReplyToID string, mediaIDs []string) (string, error) {
 	queryID := c.getQueryID("CreateTweet")
-	body := buildCreateTweetBody(text, inReplyToID, queryID)
+	body := buildCreateTweetBody(text, inReplyToID, mediaIDs, queryID)
 	headers := c.getJsonHeaders()
 	headers.Set("referer", "https://x.com/compose/post")
 
@@ -31,7 +41,7 @@ func (c *Client) createTweet(ctx context.Context, text, inReplyToID string) (str
 		// Attempt 2: refresh query IDs, retry with new ID
 		c.refreshQueryIDs(ctx)
 		queryID = c.getQueryID("CreateTweet")
-		body = buildCreateTweetBody(text, inReplyToID, queryID)
+		body = buildCreateTweetBody(text, inReplyToID, mediaIDs, queryID)
 
 		respBody, err = c.doPOSTJSON(ctx, graphqlURL("CreateTweet", queryID), headers, body)
 		if err != nil && is404(err) {
@@ -48,6 +58,9 @@ func (c *Client) createTweet(ctx context.Context, text, inReplyToID string) (str
 				return c.tryStatusUpdateFallback(ctx, text, inReplyToID)
 			}
 		}
+		if gqlErr := graphQLError(respBody, "CreateTweet"); gqlErr != nil {
+			return "", gqlErr
+		}
 		return extractCreateTweetID(respBody)
 	}
 
@@ -58,12 +71,18 @@ func (c *Client) createTweet(ctx context.Context, text, inReplyToID string) (str
 }
 
 // buildCreateTweetBody constructs the CreateTweet request body.
-func buildCreateTweetBody(text, inReplyToID, queryID string) map[string]any {
+func buildCreateTweetBody(text, inReplyToID string, mediaIDs []string, queryID string) map[string]any {
+	var mediaEntities []map[string]string
+	for _, mediaID := range mediaIDs {
+		if mediaID != "" {
+			mediaEntities = append(mediaEntities, map[string]string{"media_id": mediaID})
+		}
+	}
 	vars := map[string]any{
-		"tweet_text":               text,
-		"dark_request":             false,
-		"media":                    map[string]any{"media_entities": []any{}, "possibly_sensitive": false},
-		"semantic_annotation_ids":  []any{},
+		"tweet_text":              text,
+		"dark_request":            false,
+		"media":                   map[string]any{"media_entities": mediaEntities, "possibly_sensitive": false},
+		"semantic_annotation_ids": []any{},
 	}
 	if inReplyToID != "" {
 		vars["reply"] = map[string]any{

@@ -5,10 +5,12 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/mudrii/gobird/internal/auth"
 	"github.com/mudrii/gobird/internal/client"
 	"github.com/mudrii/gobird/internal/config"
+	"github.com/mudrii/gobird/internal/output"
 )
 
 // resolveClient builds an authenticated client from global flags and config file.
@@ -19,7 +21,11 @@ func resolveClient() (*client.Client, error) {
 	}
 
 	opts := auth.ResolveOptions{
-		Browser: globalFlags.browser,
+		Browser:         globalFlags.browser,
+		CookieSources:   resolveCookieSources(cfg),
+		ChromeProfile:   resolveChromeProfile(cfg),
+		FirefoxProfile:  firstNonEmptyString(globalFlags.firefoxProfile, cfg.FirefoxProfile),
+		CookieTimeoutMs: resolveCookieTimeoutMs(cfg),
 	}
 	if globalFlags.authToken != "" {
 		opts.FlagAuthToken = globalFlags.authToken
@@ -40,7 +46,11 @@ func resolveClient() (*client.Client, error) {
 		return nil, fmt.Errorf("resolve credentials: %w", err)
 	}
 
-	return client.New(creds.AuthToken, creds.Ct0, nil), nil
+	var clientOpts *client.Options
+	if timeoutMs := resolveTimeoutMs(cfg); timeoutMs > 0 {
+		clientOpts = &client.Options{TimeoutMs: timeoutMs}
+	}
+	return client.New(creds.AuthToken, creds.Ct0, clientOpts), nil
 }
 
 // resolveCredentialsFromOptions resolves credentials using current global flags and config.
@@ -51,7 +61,11 @@ func resolveCredentialsFromOptions() (authToken, ct0 string, err error) {
 	}
 
 	opts := auth.ResolveOptions{
-		Browser: globalFlags.browser,
+		Browser:         globalFlags.browser,
+		CookieSources:   resolveCookieSources(cfg),
+		ChromeProfile:   resolveChromeProfile(cfg),
+		FirefoxProfile:  firstNonEmptyString(globalFlags.firefoxProfile, cfg.FirefoxProfile),
+		CookieTimeoutMs: resolveCookieTimeoutMs(cfg),
 	}
 	if globalFlags.authToken != "" {
 		opts.FlagAuthToken = globalFlags.authToken
@@ -74,6 +88,65 @@ func resolveCredentialsFromOptions() (authToken, ct0 string, err error) {
 	return creds.AuthToken, creds.Ct0, nil
 }
 
+func resolveCookieSources(cfg *config.Config) []string {
+	if len(globalFlags.cookieSources) > 0 {
+		return globalFlags.cookieSources
+	}
+	if len(cfg.CookieSource) > 0 {
+		return []string(cfg.CookieSource)
+	}
+	if globalFlags.browser != "" {
+		return []string{strings.TrimSpace(globalFlags.browser)}
+	}
+	if cfg.DefaultBrowser != "" {
+		return []string{cfg.DefaultBrowser}
+	}
+	return nil
+}
+
+func resolveChromeProfile(cfg *config.Config) string {
+	return firstNonEmptyString(globalFlags.chromeProfileDir, globalFlags.chromeProfile, cfg.ChromeProfileDir, cfg.ChromeProfile)
+}
+
+func resolveTimeoutMs(cfg *config.Config) int {
+	if globalFlags.timeoutMs > 0 {
+		return globalFlags.timeoutMs
+	}
+	if cfg.TimeoutMs > 0 {
+		return cfg.TimeoutMs
+	}
+	return 0
+}
+
+func resolveCookieTimeoutMs(cfg *config.Config) int {
+	if globalFlags.cookieTimeoutMs > 0 {
+		return globalFlags.cookieTimeoutMs
+	}
+	if cfg.CookieTimeoutMs > 0 {
+		return cfg.CookieTimeoutMs
+	}
+	return 0
+}
+
+func resolveQuoteDepth(cfg *config.Config) int {
+	if globalFlags.quoteDepth >= 0 {
+		return globalFlags.quoteDepth
+	}
+	if cfg.QuoteDepth >= 0 {
+		return cfg.QuoteDepth
+	}
+	return 1
+}
+
+func firstNonEmptyString(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 // loadMedia reads file bytes from the given path.
 func loadMedia(path string) ([]byte, error) {
 	return os.ReadFile(path)
@@ -94,4 +167,20 @@ func detectMime(path string) (string, error) {
 		return "", err
 	}
 	return http.DetectContentType(buf[:n]), nil
+}
+
+func currentFormatOptions() output.FormatOptions {
+	return output.FormatOptions{
+		Plain:   globalFlags.plain,
+		NoColor: globalFlags.noColor,
+		NoEmoji: globalFlags.noEmoji,
+	}
+}
+
+func resolveQuoteDepthFromCommand() int {
+	cfg, err := config.Load(globalFlags.configPath)
+	if err != nil {
+		return 1
+	}
+	return resolveQuoteDepth(cfg)
 }

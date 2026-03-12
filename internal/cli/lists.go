@@ -1,11 +1,10 @@
 package cli
 
 import (
-	"context"
 	"fmt"
-	"strings"
 
 	"github.com/mudrii/gobird/internal/output"
+	"github.com/mudrii/gobird/internal/parsing"
 	"github.com/mudrii/gobird/internal/types"
 	"github.com/spf13/cobra"
 )
@@ -23,20 +22,19 @@ func newListsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
 			var result *types.ListResult
 			if memberships {
-				result, err = c.GetListMemberships(ctx, nil)
+				result, err = c.GetListMemberships(cmd.Context(), nil)
 			} else {
-				result, err = c.GetOwnedLists(ctx, nil)
+				result, err = c.GetOwnedLists(cmd.Context(), nil)
 			}
 			if err != nil {
 				return err
 			}
-			if asJSON {
+			if asJSON || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
-			fmtOpts := output.FormatOptions{}
+			fmtOpts := currentFormatOptions()
 			for _, l := range result.Items {
 				fmt.Fprintln(cmd.OutOrStdout(), output.FormatList(l, fmtOpts))
 			}
@@ -63,17 +61,19 @@ func newListTimelineCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			listID := extractListID(args[0])
-			ctx := context.Background()
-			opts := &types.FetchOptions{Limit: limit}
-			result, err := c.GetListTimeline(ctx, listID, opts)
+			listID := parsing.ExtractListID(args[0])
+			if listID == "" {
+				return fmt.Errorf("invalid list ID or URL: %q", args[0])
+			}
+			opts := &types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()}
+			result, err := c.GetListTimeline(cmd.Context(), listID, opts)
 			if err != nil {
 				return err
 			}
-			if asJSON {
+			if asJSON || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
-			fmtOpts := output.FormatOptions{}
+			fmtOpts := currentFormatOptions()
 			for _, t := range result.Items {
 				fmt.Fprintln(cmd.OutOrStdout(), output.FormatTweet(t, fmtOpts))
 			}
@@ -85,19 +85,4 @@ func newListTimelineCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
 	return cmd
-}
-
-// extractListID returns the list ID from a URL or raw ID string.
-func extractListID(input string) string {
-	const listPrefix = "/lists/"
-	if idx := strings.LastIndex(input, listPrefix); idx >= 0 {
-		rest := input[idx+len(listPrefix):]
-		for i, c := range rest {
-			if c == '?' || c == '#' || c == '/' {
-				return rest[:i]
-			}
-		}
-		return rest
-	}
-	return input
 }

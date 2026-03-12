@@ -4,6 +4,11 @@ import (
 	"github.com/mudrii/gobird/internal/types"
 )
 
+// TweetParseOptions controls quote expansion behavior for normalized tweets.
+type TweetParseOptions struct {
+	QuoteDepth int
+}
+
 // UnwrapTweetResult unwraps TweetWithVisibilityResults to get the inner tweet.
 // Checks result.tweet truthy — no __typename check. Correction §unwrap.
 func UnwrapTweetResult(raw *types.WireRawTweet) *types.WireRawTweet {
@@ -18,10 +23,18 @@ func UnwrapTweetResult(raw *types.WireRawTweet) *types.WireRawTweet {
 
 // MapTweetResult converts a raw wire tweet into a normalized TweetData.
 func MapTweetResult(raw *types.WireRawTweet) *types.TweetData {
+	return MapTweetResultWithOptions(raw, TweetParseOptions{QuoteDepth: 1})
+}
+
+// MapTweetResultWithOptions converts a raw wire tweet into a normalized TweetData.
+func MapTweetResultWithOptions(raw *types.WireRawTweet, opts TweetParseOptions) *types.TweetData {
 	if raw == nil {
 		return nil
 	}
 	raw = UnwrapTweetResult(raw)
+	if opts.QuoteDepth < 0 {
+		opts.QuoteDepth = 0
+	}
 
 	td := &types.TweetData{
 		ID:             raw.RestID,
@@ -41,16 +54,18 @@ func MapTweetResult(raw *types.WireRawTweet) *types.TweetData {
 	}
 
 	if raw.Core != nil {
-		if u := raw.Core.UserResults.Result; u != nil && u.Legacy != nil {
+		if u := MapUser(raw.Core.UserResults.Result); u != nil {
 			td.Author = types.TweetAuthor{
-				Username: u.Legacy.ScreenName,
-				Name:     u.Legacy.Name,
+				Username: u.Username,
+				Name:     u.Name,
 			}
 		}
 	}
 
-	if raw.QuotedResult != nil && raw.QuotedResult.Result != nil {
-		quoted := MapTweetResult(raw.QuotedResult.Result)
+	if opts.QuoteDepth > 0 && raw.QuotedResult != nil && raw.QuotedResult.Result != nil {
+		quoted := MapTweetResultWithOptions(raw.QuotedResult.Result, TweetParseOptions{
+			QuoteDepth: opts.QuoteDepth - 1,
+		})
 		td.QuotedTweet = quoted
 	}
 
@@ -75,9 +90,8 @@ func ExtractTweetText(raw *types.WireRawTweet) string {
 	}
 	// 1. Article.
 	if raw.Article != nil && raw.Article.ArticleResults.Result != nil {
-		ar := raw.Article.ArticleResults.Result
-		if ar.Title != "" {
-			return ar.Title
+		if text := ExtractArticleText(raw.Article.ArticleResults.Result); text != "" {
+			return text
 		}
 	}
 	// 2. Note tweet.

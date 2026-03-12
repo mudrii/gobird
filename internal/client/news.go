@@ -28,14 +28,18 @@ func (c *Client) GetNews(ctx context.Context, opts *types.NewsOptions) ([]types.
 
 	var allItems []types.NewsItem
 	seen := map[string]bool{}
+	var firstErr error
 
 	for _, tab := range tabs {
 		timelineID, ok := GenericTimelineTabIDs[tab]
 		if !ok {
 			continue
 		}
-		items, err := c.fetchGenericTimeline(ctx, timelineID, maxCount)
+		items, err := c.fetchGenericTimeline(ctx, timelineID, maxCount, opts.IncludeRaw)
 		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
 			continue
 		}
 		for _, item := range items {
@@ -49,6 +53,9 @@ func (c *Client) GetNews(ctx context.Context, opts *types.NewsOptions) ([]types.
 		}
 	}
 
+	if firstErr != nil {
+		return allItems, firstErr
+	}
 	return allItems, nil
 }
 
@@ -56,8 +63,7 @@ func (c *Client) GetNews(ctx context.Context, opts *types.NewsOptions) ([]types.
 // Correction #34, #67: variables: {"timelineId":"<tab-timeline-id>","count":"<maxCount*2>","includePromotedContent":false}
 // Response path: data.timeline.timeline.instructions.
 // Uses buildExploreFeatures().
-func (c *Client) fetchGenericTimeline(ctx context.Context, timelineID string, maxCount int) ([]types.NewsItem, error) {
-	queryID := c.getQueryID("GenericTimelineById")
+func (c *Client) fetchGenericTimeline(ctx context.Context, timelineID string, maxCount int, includeRaw bool) ([]types.NewsItem, error) {
 	features := buildExploreFeatures()
 
 	vars := map[string]any{
@@ -75,23 +81,51 @@ func (c *Client) fetchGenericTimeline(ctx context.Context, timelineID string, ma
 		return nil, err
 	}
 
-	reqURL := fmt.Sprintf("%s/%s/GenericTimelineById?variables=%s&features=%s",
-		GraphQLBaseURL, queryID,
-		url.QueryEscape(string(varsJSON)),
-		url.QueryEscape(string(featuresJSON)),
-	)
+	queryIDs := c.getQueryIDs("GenericTimelineById")
+	var lastErr error
 
-	body, err := c.doGET(ctx, reqURL, c.getJsonHeaders())
+	tryFetch := func(ids []string) ([]types.NewsItem, bool, error) {
+		had404 := false
+		for _, queryID := range ids {
+			reqURL := fmt.Sprintf("%s/%s/GenericTimelineById?variables=%s&features=%s",
+				GraphQLBaseURL, queryID,
+				url.QueryEscape(string(varsJSON)),
+				url.QueryEscape(string(featuresJSON)),
+			)
+			body, err := c.doGET(ctx, reqURL, c.getJsonHeaders())
+			if err != nil {
+				lastErr = err
+				if is404(err) {
+					had404 = true
+				}
+				continue
+			}
+			items, parseErr := parseGenericTimelineResponse(body, includeRaw)
+			return items, false, parseErr
+		}
+		return nil, had404, lastErr
+	}
+
+	items, had404, err := tryFetch(queryIDs)
+	if err == nil {
+		return items, nil
+	}
+	if had404 {
+		c.refreshQueryIDs(ctx)
+		items, _, err = tryFetch(c.getQueryIDs("GenericTimelineById"))
+		if err == nil {
+			return items, nil
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
-
-	return parseGenericTimelineResponse(body)
+	return nil, fmt.Errorf("GenericTimelineById failed for timeline %q", timelineID)
 }
 
 // parseGenericTimelineResponse parses the GenericTimelineById response.
 // Response path: data.timeline.timeline.instructions.
-func parseGenericTimelineResponse(body []byte) ([]types.NewsItem, error) {
+func parseGenericTimelineResponse(body []byte, includeRaw bool) ([]types.NewsItem, error) {
 	var env struct {
 		Data struct {
 			Timeline struct {
@@ -105,14 +139,14 @@ func parseGenericTimelineResponse(body []byte) ([]types.NewsItem, error) {
 		return nil, err
 	}
 	instructions := env.Data.Timeline.Timeline.Instructions
-	return parseNewsItemsFromInstructions(instructions, body)
+	return parseNewsItemsFromInstructions(instructions, body, includeRaw)
 }
 
 // parseNewsItemsFromInstructions extracts NewsItem entries from timeline instructions.
 // News items are trend/explore entries with a different wire shape than tweets.
-func parseNewsItemsFromInstructions(instructions []types.WireTimelineInstruction, body []byte) ([]types.NewsItem, error) {
+func parseNewsItemsFromInstructions(instructions []types.WireTimelineInstruction, body []byte, includeRaw bool) ([]types.NewsItem, error) {
 	// First, try to extract tweet-based news items.
-	tweets := parsing.ParseTweetsFromInstructions(instructions)
+	tweets := parsing.ParseTweetsFromInstructionsWithOptions(instructions, parsing.TweetParseOptions{QuoteDepth: 1})
 	if len(tweets) > 0 {
 		var items []types.NewsItem
 		for _, t := range tweets {
@@ -122,11 +156,21 @@ func parseNewsItemsFromInstructions(instructions []types.WireTimelineInstruction
 			}
 			items = append(items, item)
 		}
+		if includeRaw {
+			items = attachRawToNews(items, body)
+		}
 		return items, nil
 	}
 
 	// Fall back to raw JSON parsing for explore/trend entries.
-	return parseNewsItemsRaw(body)
+	items, err := parseNewsItemsRaw(body)
+	if err != nil {
+		return nil, err
+	}
+	if includeRaw {
+		items = attachRawToNews(items, body)
+	}
+	return items, nil
 }
 
 // parseNewsItemsRaw parses news items from the raw GenericTimelineById response.

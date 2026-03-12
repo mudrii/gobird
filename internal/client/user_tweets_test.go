@@ -185,7 +185,7 @@ func TestGetUserTweets_HardMaxPages(t *testing.T) {
 }
 
 func TestParseUserTweetsResponse(t *testing.T) {
-	page, err := parseUserTweetsResponse([]byte(userTweetsJSON))
+	page, err := parseUserTweetsResponse([]byte(userTweetsJSON), 1, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

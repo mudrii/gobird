@@ -48,7 +48,7 @@ func (c *Client) GetUserTweets(ctx context.Context, userID string, opts *types.U
 			}
 		}
 
-		page, err := c.fetchUserTweetsPage(ctx, userID, cursor)
+		page, err := c.fetchUserTweetsPage(ctx, userID, cursor, opts.QuoteDepth, opts.IncludeRaw)
 		if err != nil {
 			if len(allTweets) > 0 {
 				return &types.TweetResult{Items: allTweets, Success: false, Error: err, NextCursor: cursor}, nil
@@ -78,7 +78,7 @@ func (c *Client) GetUserTweets(ctx context.Context, userID string, opts *types.U
 
 // GetUserTweetsPaged fetches a single page of user tweets, returning the page result.
 func (c *Client) GetUserTweetsPaged(ctx context.Context, userID string, cursor string) (*types.TweetPage, error) {
-	page, err := c.fetchUserTweetsPage(ctx, userID, cursor)
+	page, err := c.fetchUserTweetsPage(ctx, userID, cursor, 1, false)
 	if err != nil {
 		return &types.TweetPage{Success: false, Error: err}, err
 	}
@@ -89,17 +89,17 @@ func (c *Client) GetUserTweetsPaged(ctx context.Context, userID string, cursor s
 // Correction #13: variables without withV2Timeline.
 // Correction #29: fieldToggles: {"withArticlePlainText":false}.
 // Response path: data.user.result.timeline.timeline.instructions.
-func (c *Client) fetchUserTweetsPage(ctx context.Context, userID string, cursor string) (*types.TweetPage, error) {
+func (c *Client) fetchUserTweetsPage(ctx context.Context, userID string, cursor string, quoteDepth int, includeRaw bool) (*types.TweetPage, error) {
 	queryIDs := c.getQueryIDs("UserTweets")
 	features := buildUserTweetsFeatures()
 	fieldToggles := buildUserTweetsFieldToggles()
 
 	vars := map[string]any{
-		"userId":                                   userID,
-		"count":                                    20,
-		"includePromotedContent":                   false,
-		"withQuickPromoteEligibilityTweetFields":   true,
-		"withVoice":                                true,
+		"userId":                                 userID,
+		"count":                                  20,
+		"includePromotedContent":                 false,
+		"withQuickPromoteEligibilityTweetFields": true,
+		"withVoice":                              true,
 	}
 	if cursor != "" {
 		vars["cursor"] = cursor
@@ -131,14 +131,14 @@ func (c *Client) fetchUserTweetsPage(ctx context.Context, userID string, cursor 
 			lastErr = err
 			continue
 		}
-		return parseUserTweetsResponse(body)
+		return parseUserTweetsResponse(body, quoteDepth, includeRaw)
 	}
 	return nil, fmt.Errorf("UserTweets failed for user %q: %w", userID, lastErr)
 }
 
 // parseUserTweetsResponse parses the UserTweets response.
 // Response path: data.user.result.timeline.timeline.instructions (correction #29).
-func parseUserTweetsResponse(body []byte) (*types.TweetPage, error) {
+func parseUserTweetsResponse(body []byte, quoteDepth int, includeRaw bool) (*types.TweetPage, error) {
 	var env struct {
 		Data struct {
 			User struct {
@@ -156,7 +156,10 @@ func parseUserTweetsResponse(body []byte) (*types.TweetPage, error) {
 		return nil, err
 	}
 	instructions := env.Data.User.Result.Timeline.Timeline.Instructions
-	tweets := parsing.ParseTweetsFromInstructions(instructions)
+	tweets := parsing.ParseTweetsFromInstructionsWithOptions(instructions, parsing.TweetParseOptions{QuoteDepth: quoteDepth})
+	if includeRaw {
+		tweets = attachRawToTweets(tweets, body)
+	}
 	cursor := parsing.ExtractCursorFromInstructions(instructions)
 	return &types.TweetPage{
 		Items:      tweets,

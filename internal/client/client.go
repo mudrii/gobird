@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Client is the single Twitter/X API client struct.
@@ -15,6 +17,9 @@ type Client struct {
 
 	httpClient *http.Client
 
+	clientUUID string
+	deviceID   string
+
 	// queryIDMu guards queryIDCache.
 	queryIDMu    sync.RWMutex
 	queryIDCache map[string]string
@@ -22,9 +27,9 @@ type Client struct {
 	queryIDRefreshAt time.Time
 
 	// userID is the authenticated user's numeric ID, resolved lazily.
-	userIDOnce sync.Once
-	userID     string
-	userIDErr  error
+	// userIDMu guards userID; only a successful resolution is cached.
+	userIDMu sync.Mutex
+	userID   string
 }
 
 // Options configures a Client at construction time.
@@ -33,6 +38,8 @@ type Options struct {
 	HTTPClient *http.Client
 	// QueryIDCache seeds the runtime query ID cache (useful for testing).
 	QueryIDCache map[string]string
+	// TimeoutMs overrides the default HTTP timeout when HTTPClient is not supplied.
+	TimeoutMs int
 }
 
 // New creates a new Client with the given credentials.
@@ -42,6 +49,8 @@ func New(authToken, ct0 string, opts *Options) *Client {
 		authToken:    authToken,
 		ct0:          ct0,
 		queryIDCache: make(map[string]string),
+		clientUUID:   uuid.NewString(),
+		deviceID:     uuid.NewString(),
 	}
 	if opts != nil {
 		if opts.HTTPClient != nil {
@@ -52,7 +61,11 @@ func New(authToken, ct0 string, opts *Options) *Client {
 		}
 	}
 	if c.httpClient == nil {
-		c.httpClient = &http.Client{Timeout: 30 * time.Second}
+		timeout := 30 * time.Second
+		if opts != nil && opts.TimeoutMs > 0 {
+			timeout = time.Duration(opts.TimeoutMs) * time.Millisecond
+		}
+		c.httpClient = &http.Client{Timeout: timeout}
 	}
 	return c
 }
@@ -60,30 +73,33 @@ func New(authToken, ct0 string, opts *Options) *Client {
 // getJsonHeaders returns JSON request headers for the authenticated user.
 // Correction #70: getHeaders() = getJsonHeaders().
 func (c *Client) getJsonHeaders() http.Header {
-	return jsonHeaders(c.authToken, c.ct0)
+	return jsonHeaders(c.authToken, c.ct0, c.clientUUID, c.deviceID, c.userID)
 }
 
 // getBaseHeaders returns the base request headers without content-type.
 func (c *Client) getBaseHeaders() http.Header {
-	return baseHeaders(c.authToken, c.ct0)
+	return baseHeaders(c.authToken, c.ct0, c.clientUUID, c.deviceID, c.userID)
 }
 
 // getUploadHeaders returns headers for media upload requests.
 // Correction #70: upload uses base headers only.
 func (c *Client) getUploadHeaders() http.Header {
-	return uploadHeaders(c.authToken, c.ct0)
+	return uploadHeaders(c.authToken, c.ct0, c.clientUUID, c.deviceID, c.userID)
 }
 
 // ensureClientUserID resolves and caches the authenticated user's numeric ID.
 // Called lazily before operations that require it (lists, etc.).
-func (c *Client) ensureClientUserID(ctx context.Context) (string, error) {
-	c.userIDOnce.Do(func() {
-		u, err := c.getCurrentUser(ctx)
-		if err != nil {
-			c.userIDErr = err
-			return
-		}
-		c.userID = u.ID
-	})
-	return c.userID, c.userIDErr
+// Only a successful result is cached; errors are not, so callers may retry.
+func (c *Client) ensureClientUserID(ctx context.Context) error {
+	c.userIDMu.Lock()
+	defer c.userIDMu.Unlock()
+	if c.userID != "" {
+		return nil
+	}
+	user, err := c.getCurrentUser(ctx)
+	if err != nil {
+		return err
+	}
+	c.userID = user.ID
+	return nil
 }

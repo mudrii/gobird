@@ -101,8 +101,11 @@ func (c *Client) followViaGraphQL(ctx context.Context, userID string) error {
 		"queryId":   queryID,
 	}
 	headers := c.getJsonHeaders()
-	_, err := c.doPOSTJSON(ctx, graphqlURL("CreateFriendship", queryID), headers, body)
-	return err
+	respBody, err := c.doPOSTJSON(ctx, graphqlURL("CreateFriendship", queryID), headers, body)
+	if err != nil {
+		return err
+	}
+	return graphQLError(respBody, "CreateFriendship")
 }
 
 // unfollowViaGraphQL calls the DestroyFriendship GraphQL mutation.
@@ -113,8 +116,11 @@ func (c *Client) unfollowViaGraphQL(ctx context.Context, userID string) error {
 		"queryId":   queryID,
 	}
 	headers := c.getJsonHeaders()
-	_, err := c.doPOSTJSON(ctx, graphqlURL("DestroyFriendship", queryID), headers, body)
-	return err
+	respBody, err := c.doPOSTJSON(ctx, graphqlURL("DestroyFriendship", queryID), headers, body)
+	if err != nil {
+		return err
+	}
+	return graphQLError(respBody, "DestroyFriendship")
 }
 
 // followError wraps a REST follow/unfollow error code.

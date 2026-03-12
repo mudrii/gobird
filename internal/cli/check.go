@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"context"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -16,14 +14,11 @@ func newCheckCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			c, err := quickClient()
 			if err != nil {
-				fmt.Fprintln(os.Stderr, "FAIL:", err)
-				os.Exit(1)
+				return fmt.Errorf("FAIL: %w", err)
 			}
-			ctx := context.Background()
-			u, err := c.GetCurrentUser(ctx)
+			u, err := c.GetCurrentUser(cmd.Context())
 			if err != nil {
-				fmt.Fprintln(os.Stderr, "FAIL:", err)
-				os.Exit(1)
+				return fmt.Errorf("FAIL: %w", err)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "OK: @%s\n", u.Username)
 			return nil

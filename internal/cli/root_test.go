@@ -38,3 +38,29 @@ func TestVersionCmd(t *testing.T) {
 		t.Errorf("version output missing expected values: %q", out)
 	}
 }
+
+func TestVersionFlag(t *testing.T) {
+	cli.SetBuildInfo("2.0.0", "def5678")
+	cmd := cli.NewRootCmd()
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"--version"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("--version: %v", err)
+	}
+	out := buf.String()
+	if got := strings.TrimSpace(out); got != "2.0.0 (def5678)" {
+		t.Fatalf("unexpected --version output: %q", got)
+	}
+}
+
+func TestRootRejectsTooManyArgs(t *testing.T) {
+	cmd := cli.NewRootCmd()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"one", "two"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected error for too many args")
+	}
+}

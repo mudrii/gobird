@@ -9,19 +9,22 @@ const UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/5
 
 // API base URLs.
 const (
-	GraphQLBaseURL     = "https://x.com/i/api/graphql"
-	RESTV1BaseURL      = "https://x.com/i/api/1.1"
-	MediaUploadURL     = "https://upload.twitter.com/i/media/upload.json"
-	MediaMetadataURL   = "https://x.com/i/api/1.1/media/metadata/create.json"
-	StatusUpdateURL    = "https://x.com/i/api/1.1/statuses/update.json"
-	FollowRESTURL      = "https://x.com/i/api/1.1/friendships/create.json"
-	UnfollowRESTURL    = "https://x.com/i/api/1.1/friendships/destroy.json"
-	FollowersRESTURL   = "https://x.com/i/api/1.1/followers/list.json"
-	FollowingRESTURL   = "https://x.com/i/api/1.1/friends/list.json"
-	UserLookupRESTURL  = "https://x.com/i/api/1.1/users/show.json"
-	SettingsURL        = "https://x.com/i/api/account/settings.json"
-	CredentialsURL     = "https://x.com/i/api/account/verify_credentials.json"
-	SettingsPageURL    = "https://x.com/settings/account"
+	GraphQLBaseURL           = "https://x.com/i/api/graphql"
+	RESTV1BaseURL            = "https://x.com/i/api/1.1"
+	MediaUploadURL           = "https://upload.twitter.com/i/media/upload.json"
+	MediaMetadataURL         = "https://x.com/i/api/1.1/media/metadata/create.json"
+	StatusUpdateURL          = "https://x.com/i/api/1.1/statuses/update.json"
+	FollowRESTURL            = "https://x.com/i/api/1.1/friendships/create.json"
+	UnfollowRESTURL          = "https://x.com/i/api/1.1/friendships/destroy.json"
+	FollowersRESTURL         = "https://x.com/i/api/1.1/followers/list.json"
+	FollowingRESTURL         = "https://x.com/i/api/1.1/friends/list.json"
+	UserLookupRESTURL        = "https://x.com/i/api/1.1/users/show.json"
+	SettingsURL              = "https://x.com/i/api/account/settings.json"
+	SettingsAPITwitterURL    = "https://api.twitter.com/1.1/account/settings.json"
+	CredentialsURL           = "https://x.com/i/api/account/verify_credentials.json?skip_status=true&include_entities=false"
+	CredentialsAPITwitterURL = "https://api.twitter.com/1.1/account/verify_credentials.json?skip_status=true&include_entities=false"
+	SettingsPageURL          = "https://x.com/settings/account"
+	SettingsPageTwitterURL   = "https://twitter.com/settings/account"
 )
 
 // FallbackQueryIDs contains the 29 hardcoded fallback query IDs used when

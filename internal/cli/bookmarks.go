@@ -1,10 +1,10 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/mudrii/gobird/internal/output"
+	"github.com/mudrii/gobird/internal/parsing"
 	"github.com/mudrii/gobird/internal/types"
 	"github.com/spf13/cobra"
 )
@@ -23,25 +23,24 @@ func newBookmarksCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
 			var result types.TweetResult
 			if folderID != "" {
 				opts := &types.BookmarkFolderOptions{
-					FetchOptions: types.FetchOptions{Limit: limit},
+					FetchOptions: types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()},
 					FolderID:     folderID,
 				}
-				result = c.GetBookmarkFolderTimeline(ctx, opts)
+				result = c.GetBookmarkFolderTimeline(cmd.Context(), opts)
 			} else {
-				opts := &types.FetchOptions{Limit: limit}
-				result = c.GetBookmarks(ctx, opts)
+				opts := &types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()}
+				result = c.GetBookmarks(cmd.Context(), opts)
 			}
 			if result.Error != nil {
 				return result.Error
 			}
-			if asJSON {
+			if asJSON || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
-			fmtOpts := output.FormatOptions{}
+			fmtOpts := currentFormatOptions()
 			for _, t := range result.Items {
 				fmt.Fprintln(cmd.OutOrStdout(), output.FormatTweet(t, fmtOpts))
 			}
@@ -66,40 +65,15 @@ func newUnbookmarkCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			tweetID := extractTweetID(args[0])
-			ctx := context.Background()
-			if err := c.Unbookmark(ctx, tweetID); err != nil {
+			tweetID := parsing.ExtractTweetID(args[0])
+			if tweetID == "" {
+				return fmt.Errorf("invalid tweet ID or URL: %q", args[0])
+			}
+			if err := c.Unbookmark(cmd.Context(), tweetID); err != nil {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "unbookmarked %s\n", tweetID)
 			return nil
 		},
 	}
-}
-
-// extractTweetID returns the numeric tweet ID from a URL or raw ID string.
-func extractTweetID(input string) string {
-	// Handle URLs like https://twitter.com/user/status/1234567890
-	const statusPrefix = "/status/"
-	if idx := lastIndex(input, statusPrefix); idx >= 0 {
-		rest := input[idx+len(statusPrefix):]
-		// Trim any trailing query/fragment
-		for i, c := range rest {
-			if c == '?' || c == '#' || c == '/' {
-				return rest[:i]
-			}
-		}
-		return rest
-	}
-	return input
-}
-
-func lastIndex(s, substr string) int {
-	last := -1
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			last = i
-		}
-	}
-	return last
 }

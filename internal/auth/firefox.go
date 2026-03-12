@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "modernc.org/sqlite"
 
@@ -12,7 +13,7 @@ import (
 )
 
 // extractFirefox reads cookies from Firefox's plain SQLite cookie store.
-func extractFirefox() (*types.TwitterCookies, error) {
+func extractFirefox(profileHint string) (*types.TwitterCookies, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -28,6 +29,12 @@ func extractFirefox() (*types.TwitterCookies, error) {
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
+		}
+		if profileHint != "" {
+			name := strings.TrimSpace(profileHint)
+			if name != "" && e.Name() != name && !strings.Contains(e.Name(), name) {
+				continue
+			}
 		}
 		p := filepath.Join(profileDir, e.Name(), "cookies.sqlite")
 		if _, err := os.Stat(p); err == nil {

@@ -99,7 +99,7 @@ func TestGetListTimeline_NoCursor(t *testing.T) {
 }
 
 func TestParseListTimelineResponse(t *testing.T) {
-	page, err := parseListTimelineResponse([]byte(listTimelineJSON))
+	page, err := parseListTimelineResponse([]byte(listTimelineJSON), 1, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

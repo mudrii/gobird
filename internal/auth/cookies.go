@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mudrii/gobird/internal/types"
 )
@@ -10,30 +11,44 @@ import (
 // If browser is non-empty, only that browser is tried.
 // Domain preference: x.com > twitter.com > first match. Correction: doc §auth.
 func extractFromBrowser(browser string) (*types.TwitterCookies, error) {
+	if strings.TrimSpace(browser) == "" {
+		return extractFromBrowserOrder(nil, ResolveOptions{})
+	}
+	return extractFromBrowserOrder([]string{browser}, ResolveOptions{Browser: browser})
+}
+
+// extractFromBrowserOrder tries each supported browser in order.
+func extractFromBrowserOrder(order []string, opts ResolveOptions) (*types.TwitterCookies, error) {
 	type extractor struct {
 		name string
 		fn   func() (*types.TwitterCookies, error)
 	}
 	all := []extractor{
-		{"safari", extractSafari},
-		{"chrome", extractChrome},
-		{"firefox", extractFirefox},
+		{"safari", func() (*types.TwitterCookies, error) { return extractSafari() }},
+		{"chrome", func() (*types.TwitterCookies, error) { return extractChrome(opts.ChromeProfile) }},
+		{"firefox", func() (*types.TwitterCookies, error) { return extractFirefox(opts.FirefoxProfile) }},
 	}
-	if browser != "" {
-		for _, e := range all {
-			if e.name == browser {
-				return e.fn()
-			}
-		}
-		return nil, fmt.Errorf("unknown browser: %q", browser)
+	if len(order) == 0 {
+		order = []string{"safari", "chrome", "firefox"}
 	}
 	var lastErr error
-	for _, e := range all {
-		creds, err := e.fn()
-		if err == nil && creds != nil {
-			return creds, nil
+	for _, wanted := range order {
+		matched := false
+		for _, e := range all {
+			if e.name != wanted {
+				continue
+			}
+			matched = true
+			creds, err := extractWithTimeout(opts.CookieTimeoutMs, e.fn)
+			if err == nil && creds != nil {
+				return creds, nil
+			}
+			lastErr = err
+			break
 		}
-		lastErr = err
+		if !matched {
+			return nil, fmt.Errorf("unknown browser: %q", wanted)
+		}
 	}
 	if lastErr != nil {
 		return nil, lastErr
@@ -45,6 +60,7 @@ func extractFromBrowser(browser string) (*types.TwitterCookies, error) {
 // tuples, preferring x.com > twitter.com > first match.
 func preferredDomainCookies(cookies []domainCookie) (authToken, ct0 string) {
 	domainRank := func(d string) int {
+		d = strings.TrimPrefix(d, ".")
 		switch d {
 		case "x.com":
 			return 0

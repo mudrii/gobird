@@ -18,7 +18,7 @@ var queryUnspecifiedRe = regexp.MustCompile(`(?i)query:\s*unspecified`)
 
 // homeTimelinePage fetches a single page from the given home timeline operation
 // (either "HomeTimeline" or "HomeLatestTimeline") using the supplied query ID.
-func (c *Client) homeTimelinePage(ctx context.Context, operation, queryID, cursor string, count int) inlinePageResult {
+func (c *Client) homeTimelinePage(ctx context.Context, operation, queryID, cursor string, count int, quoteDepth int, includeRaw bool) inlinePageResult {
 	vars := map[string]any{
 		"count":                  count,
 		"includePromotedContent": true,
@@ -81,7 +81,10 @@ func (c *Client) homeTimelinePage(ctx context.Context, operation, queryID, curso
 	}
 
 	instructions := resp.Data.Home.HomeTimelineUrt.Instructions
-	tweets := parsing.ParseTweetsFromInstructions(instructions)
+	tweets := parsing.ParseTweetsFromInstructionsWithOptions(instructions, parsing.TweetParseOptions{QuoteDepth: quoteDepth})
+	if includeRaw {
+		tweets = attachRawToTweets(tweets, raw)
+	}
 	nextCursor := parsing.ExtractCursorFromInstructions(instructions)
 
 	return inlinePageResult{
@@ -116,26 +119,31 @@ func (c *Client) getHomeTimelineInternal(ctx context.Context, operation string, 
 	refreshed := false
 
 	fetchFn := func(ctx context.Context, cursor string) inlinePageResult {
-		currentIDs := queryIDs
 		var lastErr error
-		for _, qid := range currentIDs {
-			result := c.homeTimelinePage(ctx, operation, qid, cursor, count)
-			if result.success {
-				return result
+		for {
+			refreshedThisRound := false
+			for _, qid := range queryIDs {
+				result := c.homeTimelinePage(ctx, operation, qid, cursor, count, opts.QuoteDepth, opts.IncludeRaw)
+				if result.success {
+					return result
+				}
+				lastErr = result.err
+
+				shouldRefresh := is404(lastErr) || isQueryUnspecifiedError(lastErr) ||
+					(lastErr != nil && strings.Contains(lastErr.Error(), "query: unspecified"))
+
+				if shouldRefresh && !refreshed {
+					refreshed = true
+					refreshedThisRound = true
+					c.refreshQueryIDs(ctx)
+					queryIDs = c.getQueryIDs(operation)
+					break
+				}
 			}
-			lastErr = result.err
-
-			shouldRefresh := is404(lastErr) || isQueryUnspecifiedError(lastErr) ||
-				(lastErr != nil && strings.Contains(lastErr.Error(), "query: unspecified"))
-
-			if shouldRefresh && !refreshed {
-				refreshed = true
-				c.refreshQueryIDs(ctx)
-				queryIDs = c.getQueryIDs(operation)
-				currentIDs = queryIDs
+			if !refreshedThisRound {
+				return inlinePageResult{success: false, err: lastErr}
 			}
 		}
-		return inlinePageResult{success: false, err: lastErr}
 	}
 
 	result := paginateInline(ctx, *opts, 0, fetchFn)

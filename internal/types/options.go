@@ -14,6 +14,8 @@ type FetchOptions struct {
 	PageDelayMs int
 	// IncludeRaw attaches the raw API response to each result item.
 	IncludeRaw bool
+	// QuoteDepth controls quoted tweet expansion depth. 0 disables recursion.
+	QuoteDepth int
 }
 
 // SearchOptions extends FetchOptions for search operations.
@@ -34,6 +36,8 @@ type UserTweetsOptions struct {
 type TweetDetailOptions struct {
 	// IncludeRaw attaches the raw API response.
 	IncludeRaw bool
+	// QuoteDepth controls quoted tweet expansion depth. 0 disables recursion.
+	QuoteDepth int
 }
 
 // ThreadOptions configures thread and reply fetches.

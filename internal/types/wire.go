@@ -2,16 +2,16 @@ package types
 
 // WireResponse is the top-level GraphQL response envelope.
 type WireResponse struct {
-	Data   map[string]any   `json:"data"`
-	Errors []WireError      `json:"errors"`
+	Data   map[string]any `json:"data"`
+	Errors []WireError    `json:"errors"`
 }
 
 // WireError represents a single GraphQL error entry.
 type WireError struct {
-	Message    string            `json:"message"`
-	Locations  []WireLocation    `json:"locations"`
-	Path       []any             `json:"path"`
-	Extensions WireErrorExt      `json:"extensions"`
+	Message    string         `json:"message"`
+	Locations  []WireLocation `json:"locations"`
+	Path       []any          `json:"path"`
+	Extensions WireErrorExt   `json:"extensions"`
 }
 
 // WireLocation is a source location within a GraphQL document.
@@ -22,45 +22,47 @@ type WireLocation struct {
 
 // WireErrorExt holds structured extension fields on a GraphQL error.
 type WireErrorExt struct {
-	Code    string `json:"code"`
-	Name    string `json:"name"`
-	Source  string `json:"source"`
-	RetryAfter *int `json:"retry_after"`
+	Code       string `json:"code"`
+	Name       string `json:"name"`
+	Source     string `json:"source"`
+	RetryAfter *int   `json:"retry_after"`
 }
 
 // WireTimelineInstruction is a single instruction within a timeline.
 type WireTimelineInstruction struct {
-	Type    string          `json:"type"`
-	Entries []WireEntry     `json:"entries"`
-	Entry   *WireEntry      `json:"entry"`
+	Type    string      `json:"type"`
+	Entries []WireEntry `json:"entries"`
+	Entry   *WireEntry  `json:"entry"`
 }
 
 // WireEntry is a single timeline entry.
 type WireEntry struct {
-	EntryID   string        `json:"entryId"`
-	SortIndex string        `json:"sortIndex"`
-	Content   WireContent   `json:"content"`
+	EntryID   string      `json:"entryId"`
+	SortIndex string      `json:"sortIndex"`
+	Content   WireContent `json:"content"`
 }
 
 // WireContent holds the typed content of a timeline entry.
 type WireContent struct {
-	EntryType  string            `json:"entryType"`
-	TypeName   string            `json:"__typename"`
-	CursorType string            `json:"cursorType"`
-	Value      string            `json:"value"`
+	EntryType   string           `json:"entryType"`
+	TypeName    string           `json:"__typename"`
+	CursorType  string           `json:"cursorType"`
+	Value       string           `json:"value"`
 	ItemContent *WireItemContent `json:"itemContent"`
-	Items      []WireItem        `json:"items"`
+	Items       []WireItem       `json:"items"`
 }
 
 // WireItem wraps an item within a module timeline entry.
 type WireItem struct {
-	EntryID string          `json:"entryId"`
-	Item    WireItemContent `json:"item"`
+	EntryID string `json:"entryId"`
+	Item    struct {
+		ItemContent *WireItemContent `json:"itemContent"`
+	} `json:"item"`
 }
 
 // WireItemContent holds the typed item payload.
 type WireItemContent struct {
-	TypeName    string          `json:"__typename"`
+	TypeName    string           `json:"__typename"`
 	TweetResult *WireTweetResult `json:"tweet_results"`
 	UserResult  *WireUserResult  `json:"user_results"`
 }
@@ -72,16 +74,16 @@ type WireTweetResult struct {
 
 // WireRawTweet represents either a tweet or a visibility wrapper.
 type WireRawTweet struct {
-	TypeName      string           `json:"__typename"`
-	RestID        string           `json:"rest_id"`
-	Core          *WireTweetCore   `json:"core"`
-	Legacy        *WireTweetLegacy `json:"legacy"`
-	Card          *WireCard        `json:"card"`
-	QuotedResult  *WireTweetResult `json:"quoted_status_result"`
-	Tweet         *WireRawTweet    `json:"tweet"`  // unwrap TweetWithVisibilityResults (correction #unwrap)
-	IsBlueVerified bool            `json:"is_blue_verified"`
-	NoteTweet     *WireNoteTweet   `json:"note_tweet"`
-	Article       *WireArticle     `json:"article"`
+	TypeName       string           `json:"__typename"`
+	RestID         string           `json:"rest_id"`
+	Core           *WireTweetCore   `json:"core"`
+	Legacy         *WireTweetLegacy `json:"legacy"`
+	Card           *WireCard        `json:"card"`
+	QuotedResult   *WireTweetResult `json:"quoted_status_result"`
+	Tweet          *WireRawTweet    `json:"tweet"` // unwrap TweetWithVisibilityResults (correction #unwrap)
+	IsBlueVerified bool             `json:"is_blue_verified"`
+	NoteTweet      *WireNoteTweet   `json:"note_tweet"`
+	Article        *WireArticle     `json:"article"`
 }
 
 // WireTweetCore holds the author user result.
@@ -91,15 +93,15 @@ type WireTweetCore struct {
 
 // WireTweetLegacy holds the legacy tweet fields.
 type WireTweetLegacy struct {
-	FullText            string             `json:"full_text"`
-	CreatedAt           string             `json:"created_at"`
-	ConversationIDStr   string             `json:"conversation_id_str"`
-	InReplyToStatusIDStr *string           `json:"in_reply_to_status_id_str"`
-	ReplyCount          int                `json:"reply_count"`
-	RetweetCount        int                `json:"retweet_count"`
-	FavoriteCount       int                `json:"favorite_count"`
-	ExtendedEntities    *WireMediaEntities `json:"extended_entities"`
-	UserIDStr           string             `json:"user_id_str"`
+	FullText             string             `json:"full_text"`
+	CreatedAt            string             `json:"created_at"`
+	ConversationIDStr    string             `json:"conversation_id_str"`
+	InReplyToStatusIDStr *string            `json:"in_reply_to_status_id_str"`
+	ReplyCount           int                `json:"reply_count"`
+	RetweetCount         int                `json:"retweet_count"`
+	FavoriteCount        int                `json:"favorite_count"`
+	ExtendedEntities     *WireMediaEntities `json:"extended_entities"`
+	UserIDStr            string             `json:"user_id_str"`
 }
 
 // WireMediaEntities holds the extended media list.
@@ -109,10 +111,10 @@ type WireMediaEntities struct {
 
 // WireMedia is a single media item in the tweet payload.
 type WireMedia struct {
-	Type             string              `json:"type"`
-	MediaURLHttps    string              `json:"media_url_https"`
-	Sizes            WireMediaSizes      `json:"sizes"`
-	VideoInfo        *WireVideoInfo      `json:"video_info"`
+	Type          string         `json:"type"`
+	MediaURLHttps string         `json:"media_url_https"`
+	Sizes         WireMediaSizes `json:"sizes"`
+	VideoInfo     *WireVideoInfo `json:"video_info"`
 }
 
 // WireMediaSizes holds the available size variants.
@@ -132,7 +134,7 @@ type WireMediaSize struct {
 
 // WireVideoInfo holds video-specific metadata.
 type WireVideoInfo struct {
-	DurationMillis *int              `json:"duration_millis"`
+	DurationMillis *int               `json:"duration_millis"`
 	Variants       []WireVideoVariant `json:"variants"`
 }
 
@@ -148,28 +150,29 @@ type WireUserResult struct {
 	Result *WireRawUser `json:"result"`
 }
 
-// WireRawUser represents either a User or UserUnavailable.
+// WireRawUser represents either a User, UserUnavailable, or UserWithVisibilityResults wrapper.
 type WireRawUser struct {
 	TypeName       string          `json:"__typename"`
 	RestID         string          `json:"rest_id"`
 	Legacy         *WireUserLegacy `json:"legacy"`
 	IsBlueVerified bool            `json:"is_blue_verified"`
+	User           *WireRawUser    `json:"user"` // unwrap UserWithVisibilityResults
 }
 
 // WireUserLegacy holds legacy user fields.
 type WireUserLegacy struct {
-	ScreenName      string `json:"screen_name"`
-	Name            string `json:"name"`
-	Description     string `json:"description"`
-	FollowersCount  int    `json:"followers_count"`
-	FriendsCount    int    `json:"friends_count"`
+	ScreenName           string `json:"screen_name"`
+	Name                 string `json:"name"`
+	Description          string `json:"description"`
+	FollowersCount       int    `json:"followers_count"`
+	FriendsCount         int    `json:"friends_count"`
 	ProfileImageURLHTTPS string `json:"profile_image_url_https"`
-	CreatedAt       string `json:"created_at"`
+	CreatedAt            string `json:"created_at"`
 }
 
 // WireCard holds Twitter card data (used for articles).
 type WireCard struct {
-	RestID string      `json:"rest_id"`
+	RestID string          `json:"rest_id"`
 	Legacy *WireCardLegacy `json:"legacy"`
 }
 
@@ -232,12 +235,12 @@ type WireArticleResult struct {
 
 // WireList is the wire-level Twitter list object.
 type WireList struct {
-	IDStr           string        `json:"id_str"`
-	Name            string        `json:"name"`
-	Description     string        `json:"description"`
-	MemberCount     int           `json:"member_count"`
-	SubscriberCount int           `json:"subscriber_count"`
-	Mode            string        `json:"mode"`
-	CreatedAt       string        `json:"created_at"`
+	IDStr           string         `json:"id_str"`
+	Name            string         `json:"name"`
+	Description     string         `json:"description"`
+	MemberCount     int            `json:"member_count"`
+	SubscriberCount int            `json:"subscriber_count"`
+	Mode            string         `json:"mode"`
+	CreatedAt       string         `json:"created_at"`
 	UserResults     WireUserResult `json:"user_results"`
 }

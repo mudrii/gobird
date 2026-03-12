@@ -15,8 +15,11 @@ func (c *Client) Like(ctx context.Context, tweetID string) error {
 	}
 	headers := c.getJsonHeaders()
 	headers.Set("referer", "https://x.com/i/status/"+tweetID)
-	_, err := c.doPOSTJSON(ctx, graphqlURL("FavoriteTweet", queryID), headers, body)
-	return err
+	respBody, err := c.doPOSTJSON(ctx, graphqlURL("FavoriteTweet", queryID), headers, body)
+	if err != nil {
+		return err
+	}
+	return graphQLError(respBody, "FavoriteTweet")
 }
 
 // Unlike unlikes a tweet. Returns nil on success.
@@ -28,8 +31,11 @@ func (c *Client) Unlike(ctx context.Context, tweetID string) error {
 	}
 	headers := c.getJsonHeaders()
 	headers.Set("referer", "https://x.com/i/status/"+tweetID)
-	_, err := c.doPOSTJSON(ctx, graphqlURL("UnfavoriteTweet", queryID), headers, body)
-	return err
+	respBody, err := c.doPOSTJSON(ctx, graphqlURL("UnfavoriteTweet", queryID), headers, body)
+	if err != nil {
+		return err
+	}
+	return graphQLError(respBody, "UnfavoriteTweet")
 }
 
 // Retweet retweets a tweet. Returns the retweet ID on success.
@@ -44,6 +50,9 @@ func (c *Client) Retweet(ctx context.Context, tweetID string) (string, error) {
 	respBody, err := c.doPOSTJSON(ctx, graphqlURL("CreateRetweet", queryID), headers, body)
 	if err != nil {
 		return "", err
+	}
+	if gqlErr := graphQLError(respBody, "CreateRetweet"); gqlErr != nil {
+		return "", gqlErr
 	}
 	return extractRetweetID(respBody)
 }
@@ -77,15 +86,18 @@ func (c *Client) Unretweet(ctx context.Context, tweetID string) error {
 	// Correction #3: DeleteRetweet body uses tweet_id and source_tweet_id (both set to tweetID).
 	body := map[string]any{
 		"variables": map[string]any{
-			"tweet_id":       tweetID,
+			"tweet_id":        tweetID,
 			"source_tweet_id": tweetID,
 		},
 		"queryId": queryID,
 	}
 	headers := c.getJsonHeaders()
 	headers.Set("referer", "https://x.com/i/status/"+tweetID)
-	_, err := c.doPOSTJSON(ctx, graphqlURL("DeleteRetweet", queryID), headers, body)
-	return err
+	respBody, err := c.doPOSTJSON(ctx, graphqlURL("DeleteRetweet", queryID), headers, body)
+	if err != nil {
+		return err
+	}
+	return graphQLError(respBody, "DeleteRetweet")
 }
 
 // Bookmark adds a tweet to the authenticated user's bookmarks.
@@ -97,6 +109,9 @@ func (c *Client) Bookmark(ctx context.Context, tweetID string) error {
 	}
 	headers := c.getJsonHeaders()
 	headers.Set("referer", "https://x.com/i/status/"+tweetID)
-	_, err := c.doPOSTJSON(ctx, graphqlURL("CreateBookmark", queryID), headers, body)
-	return err
+	respBody, err := c.doPOSTJSON(ctx, graphqlURL("CreateBookmark", queryID), headers, body)
+	if err != nil {
+		return err
+	}
+	return graphQLError(respBody, "CreateBookmark")
 }

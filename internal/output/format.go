@@ -2,6 +2,7 @@ package output
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mudrii/gobird/internal/types"
 )
@@ -14,30 +15,51 @@ type FormatOptions struct {
 }
 
 // FormatTweet formats a tweet as "@handle: text (likes: N, rts: N)".
-func FormatTweet(t types.TweetData, _ FormatOptions) string {
-	return fmt.Sprintf("@%s: %s (likes: %d, rts: %d)",
-		t.Author.Username, t.Text, t.LikeCount, t.RetweetCount)
+func FormatTweet(t types.TweetData, opts FormatOptions) string {
+	handle := "@" + t.Author.Username
+	if !opts.NoColor && !opts.Plain {
+		handle = "\x1b[1m" + handle + "\x1b[0m"
+	}
+	prefix := ""
+	if !opts.NoEmoji && !opts.Plain {
+		prefix = "🐦 "
+	}
+	text := strings.TrimSpace(t.Text)
+	return fmt.Sprintf("%s%s: %s (likes: %d, rts: %d)",
+		prefix, handle, text, t.LikeCount, t.RetweetCount)
 }
 
 // FormatUser formats a TwitterUser as "@handle (Name) — followers: N, following: N".
-func FormatUser(u types.TwitterUser, _ FormatOptions) string {
-	return fmt.Sprintf("@%s (%s) — followers: %d, following: %d",
-		u.Username, u.Name, u.FollowersCount, u.FollowingCount)
+func FormatUser(u types.TwitterUser, opts FormatOptions) string {
+	prefix := ""
+	if !opts.NoEmoji && !opts.Plain {
+		prefix = "👤 "
+	}
+	return fmt.Sprintf("%s@%s (%s) - followers: %d, following: %d",
+		prefix, u.Username, u.Name, u.FollowersCount, u.FollowingCount)
 }
 
 // FormatList formats a TwitterList as "Name [ID] (members: N)".
-func FormatList(l types.TwitterList, _ FormatOptions) string {
+func FormatList(l types.TwitterList, opts FormatOptions) string {
 	owner := ""
 	if l.Owner != nil {
 		owner = fmt.Sprintf(", owner: @%s", l.Owner.Username)
 	}
-	return fmt.Sprintf("%s [%s] (members: %d%s)", l.Name, l.ID, l.MemberCount, owner)
+	prefix := ""
+	if !opts.NoEmoji && !opts.Plain {
+		prefix = "📋 "
+	}
+	return fmt.Sprintf("%s%s [%s] (members: %d%s)", prefix, l.Name, l.ID, l.MemberCount, owner)
 }
 
 // FormatNewsItem formats a NewsItem as "Headline (Category)".
-func FormatNewsItem(n types.NewsItem, _ FormatOptions) string {
-	if n.Category != "" {
-		return fmt.Sprintf("%s (%s)", n.Headline, n.Category)
+func FormatNewsItem(n types.NewsItem, opts FormatOptions) string {
+	prefix := ""
+	if !opts.NoEmoji && !opts.Plain {
+		prefix = "📰 "
 	}
-	return n.Headline
+	if n.Category != "" {
+		return fmt.Sprintf("%s%s (%s)", prefix, n.Headline, n.Category)
+	}
+	return prefix + n.Headline
 }

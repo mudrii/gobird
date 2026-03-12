@@ -176,6 +176,14 @@ func parseGraphQLErrors(body []byte) []graphqlError {
 	return env.Errors
 }
 
+func graphQLError(body []byte, operation string) error {
+	errs := parseGraphQLErrors(body)
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%s: %s", operation, errs[0].Message)
+}
+
 type graphqlError struct {
 	Message    string          `json:"message"`
 	Extensions errorExtensions `json:"extensions"`

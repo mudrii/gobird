@@ -18,11 +18,10 @@ func (c *Client) GetOwnedLists(ctx context.Context, opts *types.FetchOptions) (*
 	if opts == nil {
 		opts = &types.FetchOptions{}
 	}
-	userID, err := c.ensureClientUserID(ctx)
-	if err != nil {
+	if err := c.ensureClientUserID(ctx); err != nil {
 		return nil, err
 	}
-	return c.fetchLists(ctx, "ListOwnerships", userID, opts)
+	return c.fetchLists(ctx, "ListOwnerships", c.userID, opts)
 }
 
 // GetListMemberships returns the lists the authenticated user is a member of.
@@ -31,11 +30,10 @@ func (c *Client) GetListMemberships(ctx context.Context, opts *types.FetchOption
 	if opts == nil {
 		opts = &types.FetchOptions{}
 	}
-	userID, err := c.ensureClientUserID(ctx)
-	if err != nil {
+	if err := c.ensureClientUserID(ctx); err != nil {
 		return nil, err
 	}
-	return c.fetchLists(ctx, "ListMemberships", userID, opts)
+	return c.fetchLists(ctx, "ListMemberships", c.userID, opts)
 }
 
 // fetchLists paginates a list operation (ListOwnerships or ListMemberships).
@@ -59,7 +57,7 @@ func (c *Client) fetchLists(ctx context.Context, operation string, userID string
 			}
 		}
 
-		page, err := c.fetchListsPage(ctx, operation, userID, cursor)
+		page, err := c.fetchListsPage(ctx, operation, userID, cursor, opts.IncludeRaw)
 		if err != nil {
 			if len(allLists) > 0 {
 				return &types.ListResult{Items: allLists, Success: false, Error: err, NextCursor: cursor}, nil
@@ -90,15 +88,15 @@ func (c *Client) fetchLists(ctx context.Context, operation string, userID string
 // Correction #30: ListOwnerships variables:
 // {"userId":"<currentUserId>","count":100,"isListMembershipShown":true,"isListMemberTargetUserId":"<currentUserId>"}
 // No cursor even for pagination.
-func (c *Client) fetchListsPage(ctx context.Context, operation string, userID string, cursor string) (*types.ListPage, error) {
+func (c *Client) fetchListsPage(ctx context.Context, operation string, userID string, cursor string, includeRaw bool) (*types.ListPage, error) {
 	queryIDs := c.getQueryIDs(operation)
 	features := buildListsFeatures()
 
 	vars := map[string]any{
-		"userId":                      userID,
-		"count":                       100,
-		"isListMembershipShown":       true,
-		"isListMemberTargetUserId":    userID,
+		"userId":                   userID,
+		"count":                    100,
+		"isListMembershipShown":    true,
+		"isListMemberTargetUserId": userID,
 	}
 	// Correction #30: no cursor for list pagination.
 
@@ -123,7 +121,7 @@ func (c *Client) fetchListsPage(ctx context.Context, operation string, userID st
 			lastErr = err
 			continue
 		}
-		return parseListsFromInstructions(body)
+		return parseListsFromInstructions(body, includeRaw)
 	}
 	return nil, fmt.Errorf("%s failed: %w", operation, lastErr)
 }
@@ -155,7 +153,7 @@ func (c *Client) GetListTimeline(ctx context.Context, listID string, opts *types
 			}
 		}
 
-		page, err := c.fetchListTimelinePage(ctx, listID, cursor)
+		page, err := c.fetchListTimelinePage(ctx, listID, cursor, opts.QuoteDepth, opts.IncludeRaw)
 		if err != nil {
 			if len(allTweets) > 0 {
 				return &types.TweetResult{Items: allTweets, Success: false, Error: err, NextCursor: cursor}, nil
@@ -183,7 +181,7 @@ func (c *Client) GetListTimeline(ctx context.Context, listID string, opts *types
 }
 
 // fetchListTimelinePage fetches a single page of list timeline tweets.
-func (c *Client) fetchListTimelinePage(ctx context.Context, listID string, cursor string) (*types.TweetPage, error) {
+func (c *Client) fetchListTimelinePage(ctx context.Context, listID string, cursor string, quoteDepth int, includeRaw bool) (*types.TweetPage, error) {
 	queryIDs := c.getQueryIDs("ListLatestTweetsTimeline")
 	features := buildListsFeatures()
 
@@ -216,14 +214,14 @@ func (c *Client) fetchListTimelinePage(ctx context.Context, listID string, curso
 			lastErr = err
 			continue
 		}
-		return parseListTimelineResponse(body)
+		return parseListTimelineResponse(body, quoteDepth, includeRaw)
 	}
 	return nil, fmt.Errorf("ListLatestTweetsTimeline failed for list %q: %w", listID, lastErr)
 }
 
 // parseListTimelineResponse parses the ListLatestTweetsTimeline response.
 // Correction #45: data.list.tweets_timeline.timeline.instructions.
-func parseListTimelineResponse(body []byte) (*types.TweetPage, error) {
+func parseListTimelineResponse(body []byte, quoteDepth int, includeRaw bool) (*types.TweetPage, error) {
 	var env struct {
 		Data struct {
 			List struct {
@@ -239,7 +237,10 @@ func parseListTimelineResponse(body []byte) (*types.TweetPage, error) {
 		return nil, err
 	}
 	instructions := env.Data.List.TweetsTimeline.Timeline.Instructions
-	tweets := parsing.ParseTweetsFromInstructions(instructions)
+	tweets := parsing.ParseTweetsFromInstructionsWithOptions(instructions, parsing.TweetParseOptions{QuoteDepth: quoteDepth})
+	if includeRaw {
+		tweets = attachRawToTweets(tweets, body)
+	}
 	cursor := parsing.ExtractCursorFromInstructions(instructions)
 	return &types.TweetPage{
 		Items:      tweets,
@@ -250,7 +251,7 @@ func parseListTimelineResponse(body []byte) (*types.TweetPage, error) {
 
 // parseListsFromInstructions parses list items from the GraphQL response.
 // Response path: data.user.result.timeline.timeline.instructions.
-func parseListsFromInstructions(body []byte) (*types.ListPage, error) {
+func parseListsFromInstructions(body []byte, includeRaw bool) (*types.ListPage, error) {
 	var env struct {
 		Data struct {
 			User struct {
@@ -330,6 +331,9 @@ func parseListsFromInstructions(body []byte) (*types.ListPage, error) {
 	}
 
 	cursor := parsing.ExtractCursorFromInstructions(instructions)
+	if includeRaw {
+		lists = attachRawToLists(lists, body)
+	}
 	return &types.ListPage{
 		Items:      lists,
 		NextCursor: cursor,

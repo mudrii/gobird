@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"context"
 	"fmt"
+	"strings"
 
 	"github.com/mudrii/gobird/internal/output"
 	"github.com/mudrii/gobird/internal/types"
@@ -10,7 +10,7 @@ import (
 )
 
 func newFollowingCmd() *cobra.Command {
-	var userHandle string
+	var userIDFlag string
 	var limit int
 	var asJSON bool
 
@@ -23,29 +23,28 @@ func newFollowingCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
 			var userID string
-			if userHandle != "" {
-				userID, err = c.GetUserIDByUsername(ctx, stripAtPrefix(userHandle))
-				if err != nil {
-					return err
+			if userIDFlag != "" {
+				if strings.HasPrefix(userIDFlag, "@") {
+					return fmt.Errorf("--user must be a numeric user ID, got handle %q", userIDFlag)
 				}
+				userID = userIDFlag
 			} else {
-				u, err := c.GetCurrentUser(ctx)
+				u, err := c.GetCurrentUser(cmd.Context())
 				if err != nil {
 					return err
 				}
 				userID = u.ID
 			}
-			opts := &types.FetchOptions{Limit: limit}
-			result, err := c.GetFollowing(ctx, userID, opts)
+			opts := &types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()}
+			result, err := c.GetFollowing(cmd.Context(), userID, opts)
 			if err != nil {
 				return err
 			}
-			if asJSON {
+			if asJSON || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
-			fmtOpts := output.FormatOptions{}
+			fmtOpts := currentFormatOptions()
 			for _, u := range result.Items {
 				fmt.Fprintln(cmd.OutOrStdout(), output.FormatUser(u, fmtOpts))
 			}
@@ -53,7 +52,7 @@ func newFollowingCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&userHandle, "user", "", "Twitter handle (e.g. @jack)")
+	cmd.Flags().StringVar(&userIDFlag, "user", "", "Numeric Twitter user ID")
 	cmd.Flags().IntVar(&limit, "limit", 0, "Maximum number of users to fetch")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
@@ -61,7 +60,7 @@ func newFollowingCmd() *cobra.Command {
 }
 
 func newFollowersCmd() *cobra.Command {
-	var userHandle string
+	var userIDFlag string
 	var limit int
 	var asJSON bool
 
@@ -74,30 +73,28 @@ func newFollowersCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
 			var userID string
-			var fetchErr error
-			if userHandle != "" {
-				userID, fetchErr = c.GetUserIDByUsername(ctx, stripAtPrefix(userHandle))
-				if fetchErr != nil {
-					return fetchErr
+			if userIDFlag != "" {
+				if strings.HasPrefix(userIDFlag, "@") {
+					return fmt.Errorf("--user must be a numeric user ID, got handle %q", userIDFlag)
 				}
+				userID = userIDFlag
 			} else {
-				u, fetchErr := c.GetCurrentUser(ctx)
-				if fetchErr != nil {
-					return fetchErr
+				u, err := c.GetCurrentUser(cmd.Context())
+				if err != nil {
+					return err
 				}
 				userID = u.ID
 			}
-			opts := &types.FetchOptions{Limit: limit}
-			result, err := c.GetFollowers(ctx, userID, opts)
+			opts := &types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull}
+			result, err := c.GetFollowers(cmd.Context(), userID, opts)
 			if err != nil {
 				return err
 			}
-			if asJSON {
+			if asJSON || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
-			fmtOpts := output.FormatOptions{}
+			fmtOpts := currentFormatOptions()
 			for _, u := range result.Items {
 				fmt.Fprintln(cmd.OutOrStdout(), output.FormatUser(u, fmtOpts))
 			}
@@ -105,7 +102,7 @@ func newFollowersCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&userHandle, "user", "", "Twitter handle (e.g. @jack)")
+	cmd.Flags().StringVar(&userIDFlag, "user", "", "Numeric Twitter user ID")
 	cmd.Flags().IntVar(&limit, "limit", 0, "Maximum number of users to fetch")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
@@ -125,16 +122,15 @@ func newLikesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
-			opts := &types.FetchOptions{Limit: limit}
-			result := c.GetLikes(ctx, opts)
+			opts := &types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull}
+			result := c.GetLikes(cmd.Context(), opts)
 			if result.Error != nil {
 				return result.Error
 			}
-			if asJSON {
+			if asJSON || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
-			fmtOpts := output.FormatOptions{}
+			fmtOpts := currentFormatOptions()
 			for _, t := range result.Items {
 				fmt.Fprintln(cmd.OutOrStdout(), output.FormatTweet(t, fmtOpts))
 			}
@@ -158,8 +154,7 @@ func newWhoamiCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
-			u, err := c.GetCurrentUser(ctx)
+			u, err := c.GetCurrentUser(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -180,8 +175,7 @@ func newAboutCmd() *cobra.Command {
 				return err
 			}
 			handle := stripAtPrefix(args[0])
-			ctx := context.Background()
-			u, err := c.GetUserAboutAccount(ctx, handle)
+			u, err := c.GetUserAboutAccount(cmd.Context(), handle)
 			if err != nil {
 				return err
 			}
@@ -194,7 +188,7 @@ func newAboutCmd() *cobra.Command {
 
 func newFollowCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "follow <@handle>",
+		Use:   "follow <@handle-or-id>",
 		Short: "Follow a user",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -202,16 +196,21 @@ func newFollowCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
-			handle := stripAtPrefix(args[0])
-			userID, err := c.GetUserIDByUsername(ctx, handle)
-			if err != nil {
+			input := args[0]
+			userID := input
+			label := input
+			if strings.HasPrefix(input, "@") {
+				label = stripAtPrefix(input)
+				var err error
+				userID, err = c.GetUserIDByUsername(cmd.Context(), label)
+				if err != nil {
+					return err
+				}
+			}
+			if err := c.Follow(cmd.Context(), userID); err != nil {
 				return err
 			}
-			if err := c.Follow(ctx, userID); err != nil {
-				return err
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "followed @%s\n", handle)
+			fmt.Fprintf(cmd.OutOrStdout(), "followed %s\n", label)
 			return nil
 		},
 	}
@@ -219,7 +218,7 @@ func newFollowCmd() *cobra.Command {
 
 func newUnfollowCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "unfollow <@handle>",
+		Use:   "unfollow <@handle-or-id>",
 		Short: "Unfollow a user",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -227,16 +226,21 @@ func newUnfollowCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
-			handle := stripAtPrefix(args[0])
-			userID, err := c.GetUserIDByUsername(ctx, handle)
-			if err != nil {
+			input := args[0]
+			userID := input
+			label := input
+			if strings.HasPrefix(input, "@") {
+				label = stripAtPrefix(input)
+				var err error
+				userID, err = c.GetUserIDByUsername(cmd.Context(), label)
+				if err != nil {
+					return err
+				}
+			}
+			if err := c.Unfollow(cmd.Context(), userID); err != nil {
 				return err
 			}
-			if err := c.Unfollow(ctx, userID); err != nil {
-				return err
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "unfollowed @%s\n", handle)
+			fmt.Fprintf(cmd.OutOrStdout(), "unfollowed %s\n", label)
 			return nil
 		},
 	}

@@ -50,7 +50,7 @@ func (c *Client) paginateFollowOp(ctx context.Context, operation string, userID 
 			}
 		}
 
-		page, err := c.fetchFollowPageWithRefresh(ctx, operation, userID, cursor)
+		page, err := c.fetchFollowPageWithRefresh(ctx, operation, userID, cursor, opts.IncludeRaw)
 		if err != nil {
 			if len(allUsers) > 0 {
 				return &types.UserResult{Items: allUsers, Success: false, Error: err, NextCursor: cursor}, nil
@@ -79,11 +79,11 @@ func (c *Client) paginateFollowOp(ctx context.Context, operation string, userID 
 
 // fetchFollowPageWithRefresh fetches a single page with withRefreshedQueryIDsOn404.
 // Correction #82: REST fallback only when refreshed=true after 404.
-func (c *Client) fetchFollowPageWithRefresh(ctx context.Context, operation string, userID string, cursor string) (*types.UserPage, error) {
+func (c *Client) fetchFollowPageWithRefresh(ctx context.Context, operation string, userID string, cursor string, includeRaw bool) (*types.UserPage, error) {
 	var page *types.UserPage
 
 	attempt := func() attemptResult {
-		p, err := c.fetchFollowPage(ctx, operation, userID, cursor)
+		p, err := c.fetchFollowPage(ctx, operation, userID, cursor, includeRaw)
 		if err != nil {
 			had404 := is404(err)
 			return attemptResult{err: err, had404: had404}
@@ -100,7 +100,7 @@ func (c *Client) fetchFollowPageWithRefresh(ctx context.Context, operation strin
 
 	if refreshed && ar.had404 {
 		// REST fallback (only when refreshed=true after 404).
-		return c.fetchFollowPageREST(ctx, operation, userID, cursor)
+		return c.fetchFollowPageREST(ctx, operation, userID, cursor, includeRaw)
 	}
 
 	return nil, ar.err
@@ -109,7 +109,7 @@ func (c *Client) fetchFollowPageWithRefresh(ctx context.Context, operation strin
 // fetchFollowPage fetches a single page using GraphQL.
 // Correction #14: variables: {"userId":"<userId>","count":20,"includePromotedContent":false}.
 // Response path: data.user.result.timeline.timeline.instructions.
-func (c *Client) fetchFollowPage(ctx context.Context, operation string, userID string, cursor string) (*types.UserPage, error) {
+func (c *Client) fetchFollowPage(ctx context.Context, operation string, userID string, cursor string, includeRaw bool) (*types.UserPage, error) {
 	queryIDs := c.getQueryIDs(operation)
 	features := buildFollowingFeatures()
 
@@ -143,7 +143,7 @@ func (c *Client) fetchFollowPage(ctx context.Context, operation string, userID s
 			lastErr = err
 			continue
 		}
-		return parseFollowResponse(body)
+		return parseFollowResponse(body, includeRaw)
 	}
 	if lastErr != nil {
 		return nil, lastErr
@@ -155,7 +155,7 @@ func (c *Client) fetchFollowPage(ctx context.Context, operation string, userID s
 // Correction #82: GET https://x.com/i/api/1.1/friends/list.json for following,
 // https://x.com/i/api/1.1/followers/list.json for followers.
 // Fallback: api.twitter.com mirror.
-func (c *Client) fetchFollowPageREST(ctx context.Context, operation string, userID string, cursor string) (*types.UserPage, error) {
+func (c *Client) fetchFollowPageREST(ctx context.Context, operation string, userID string, cursor string, includeRaw bool) (*types.UserPage, error) {
 	var primaryURL, fallbackURL string
 	count := 20
 
@@ -183,12 +183,12 @@ func (c *Client) fetchFollowPageREST(ctx context.Context, operation string, user
 			return nil, err
 		}
 	}
-	return parseRESTFollowResponse(body)
+	return parseRESTFollowResponse(body, includeRaw)
 }
 
 // parseFollowResponse parses the GraphQL following/followers response.
 // Response path: data.user.result.timeline.timeline.instructions.
-func parseFollowResponse(body []byte) (*types.UserPage, error) {
+func parseFollowResponse(body []byte, includeRaw bool) (*types.UserPage, error) {
 	var env struct {
 		Data struct {
 			User struct {
@@ -207,6 +207,9 @@ func parseFollowResponse(body []byte) (*types.UserPage, error) {
 	}
 	instructions := env.Data.User.Result.Timeline.Timeline.Instructions
 	users := parsing.ParseUsersFromInstructions(instructions)
+	if includeRaw {
+		users = attachRawToUsers(users, body)
+	}
 	cursor := parsing.ExtractCursorFromInstructions(instructions)
 	return &types.UserPage{
 		Items:      users,
@@ -217,18 +220,18 @@ func parseFollowResponse(body []byte) (*types.UserPage, error) {
 
 // parseRESTFollowResponse parses the REST following/followers response.
 // REST returns {"users":[...],"next_cursor_str":"..."}.
-func parseRESTFollowResponse(body []byte) (*types.UserPage, error) {
+func parseRESTFollowResponse(body []byte, includeRaw bool) (*types.UserPage, error) {
 	var env struct {
 		Users []struct {
-			IDStr          string `json:"id_str"`
-			ScreenName     string `json:"screen_name"`
-			Name           string `json:"name"`
-			Description    string `json:"description"`
-			FollowersCount int    `json:"followers_count"`
-			FriendsCount   int    `json:"friends_count"`
+			IDStr                string `json:"id_str"`
+			ScreenName           string `json:"screen_name"`
+			Name                 string `json:"name"`
+			Description          string `json:"description"`
+			FollowersCount       int    `json:"followers_count"`
+			FriendsCount         int    `json:"friends_count"`
 			ProfileImageURLHTTPS string `json:"profile_image_url_https"`
-			CreatedAt      string `json:"created_at"`
-			Verified       bool   `json:"verified"`
+			CreatedAt            string `json:"created_at"`
+			Verified             bool   `json:"verified"`
 		} `json:"users"`
 		NextCursorStr string `json:"next_cursor_str"`
 	}
@@ -244,9 +247,13 @@ func parseRESTFollowResponse(body []byte) (*types.UserPage, error) {
 			Description:     u.Description,
 			FollowersCount:  u.FollowersCount,
 			FollowingCount:  u.FriendsCount,
+			IsBlueVerified:  u.Verified,
 			ProfileImageURL: u.ProfileImageURLHTTPS,
 			CreatedAt:       u.CreatedAt,
 		})
+	}
+	if includeRaw {
+		users = attachRawToUsers(users, body)
 	}
 	nextCursor := env.NextCursorStr
 	if nextCursor == "0" {

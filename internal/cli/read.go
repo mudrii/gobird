@@ -15,34 +15,39 @@ func newReadCmd() *cobra.Command {
 		Short: "Read a single tweet",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			tweetID := parsing.ExtractTweetID(args[0])
-			if tweetID == "" {
-				return fmt.Errorf("invalid tweet ID or URL: %q", args[0])
-			}
-
-			c, err := resolveClient()
-			if err != nil {
-				return fmt.Errorf("auth: %w", err)
-			}
-
-			opts := &types.TweetDetailOptions{
-				IncludeRaw: globalFlags.jsonFull,
-			}
-
-			tweet, err := c.GetTweet(cmd.Context(), tweetID, opts)
-			if err != nil {
-				return fmt.Errorf("read: %w", err)
-			}
-
-			if globalFlags.jsonOutput || globalFlags.jsonFull {
-				out, _ := json.MarshalIndent(tweet, "", "  ")
-				cmd.Println(string(out))
-			} else {
-				printTweet(cmd, tweet)
-			}
-			return nil
+			return runRead(cmd, args[0])
 		},
 	}
+}
+
+func runRead(cmd *cobra.Command, input string) error {
+	tweetID := parsing.ExtractTweetID(input)
+	if tweetID == "" {
+		return fmt.Errorf("invalid tweet ID or URL: %q", input)
+	}
+
+	c, err := resolveClient()
+	if err != nil {
+		return fmt.Errorf("auth: %w", err)
+	}
+
+	opts := &types.TweetDetailOptions{
+		IncludeRaw: globalFlags.jsonFull,
+		QuoteDepth: resolveQuoteDepthFromCommand(),
+	}
+
+	tweet, err := c.GetTweet(cmd.Context(), tweetID, opts)
+	if err != nil {
+		return fmt.Errorf("read: %w", err)
+	}
+
+	if globalFlags.jsonOutput || globalFlags.jsonFull {
+		out, _ := json.MarshalIndent(tweet, "", "  ")
+		cmd.Println(string(out))
+	} else {
+		printTweet(cmd, tweet)
+	}
+	return nil
 }
 
 func newRepliesCmd() *cobra.Command {
@@ -63,8 +68,9 @@ func newRepliesCmd() *cobra.Command {
 
 			opts := &types.ThreadOptions{
 				FetchOptions: types.FetchOptions{
-					Limit:    globalFlags.limit,
-					MaxPages: globalFlags.maxPages,
+					Limit:      globalFlags.limit,
+					MaxPages:   globalFlags.maxPages,
+					QuoteDepth: resolveQuoteDepthFromCommand(),
 					IncludeRaw: globalFlags.jsonFull,
 				},
 			}
@@ -116,8 +122,9 @@ func newThreadCmd() *cobra.Command {
 
 			opts := &types.ThreadOptions{
 				FetchOptions: types.FetchOptions{
-					Limit:    globalFlags.limit,
-					MaxPages: globalFlags.maxPages,
+					Limit:      globalFlags.limit,
+					MaxPages:   globalFlags.maxPages,
+					QuoteDepth: resolveQuoteDepthFromCommand(),
 					IncludeRaw: globalFlags.jsonFull,
 				},
 				FilterMode: filterMode,

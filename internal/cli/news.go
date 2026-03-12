@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -25,16 +24,15 @@ func newNewsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
-			opts := buildNewsOpts(tabsFlag, limit, client.DefaultNewsTabs)
-			items, err := c.GetNews(ctx, opts)
+			opts := buildNewsOpts(tabsFlag, limit, client.DefaultNewsTabs, globalFlags.jsonFull)
+			items, err := c.GetNews(cmd.Context(), opts)
 			if err != nil {
 				return err
 			}
-			if asJSON {
+			if asJSON || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), items)
 			}
-			fmtOpts := output.FormatOptions{}
+			fmtOpts := currentFormatOptions()
 			for _, n := range items {
 				fmt.Fprintln(cmd.OutOrStdout(), output.FormatNewsItem(n, fmtOpts))
 			}
@@ -62,16 +60,15 @@ func newTrendingCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			ctx := context.Background()
-			opts := buildNewsOpts("trending", limit, nil)
-			items, err := c.GetNews(ctx, opts)
+			opts := buildNewsOpts("trending", limit, nil, globalFlags.jsonFull)
+			items, err := c.GetNews(cmd.Context(), opts)
 			if err != nil {
 				return err
 			}
-			if asJSON {
+			if asJSON || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), items)
 			}
-			fmtOpts := output.FormatOptions{}
+			fmtOpts := currentFormatOptions()
 			for _, n := range items {
 				fmt.Fprintln(cmd.OutOrStdout(), output.FormatNewsItem(n, fmtOpts))
 			}
@@ -85,7 +82,7 @@ func newTrendingCmd() *cobra.Command {
 	return cmd
 }
 
-func buildNewsOpts(tabsFlag string, limit int, defaultTabs []string) *types.NewsOptions {
+func buildNewsOpts(tabsFlag string, limit int, defaultTabs []string, includeRaw bool) *types.NewsOptions {
 	var tabs []string
 	if tabsFlag != "" {
 		for _, t := range strings.Split(tabsFlag, ",") {
@@ -103,7 +100,8 @@ func buildNewsOpts(tabsFlag string, limit int, defaultTabs []string) *types.News
 		maxCount = 20
 	}
 	return &types.NewsOptions{
-		Tabs:     tabs,
-		MaxCount: maxCount,
+		Tabs:       tabs,
+		MaxCount:   maxCount,
+		IncludeRaw: includeRaw,
 	}
 }

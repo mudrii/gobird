@@ -11,6 +11,9 @@ func (c *Client) Unbookmark(ctx context.Context, tweetID string) error {
 	}
 	headers := c.getJsonHeaders()
 	headers.Set("referer", "https://x.com/i/status/"+tweetID)
-	_, err := c.doPOSTJSON(ctx, graphqlURL("DeleteBookmark", queryID), headers, body)
-	return err
+	respBody, err := c.doPOSTJSON(ctx, graphqlURL("DeleteBookmark", queryID), headers, body)
+	if err != nil {
+		return err
+	}
+	return graphQLError(respBody, "DeleteBookmark")
 }
