@@ -194,3 +194,140 @@ func TestFilterFullChain_Single(t *testing.T) {
 		t.Errorf("FilterFullChain: want 1 item for single tweet, got %d", len(result))
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Additional thread filter edge cases
+// ---------------------------------------------------------------------------
+
+func TestAddThreadMetadata_TwoTweets_SameAuthor(t *testing.T) {
+	tweets := []types.TweetData{
+		makeTweet("A", "alice", ""),
+		makeTweet("B", "alice", "A"),
+	}
+	result := parsing.AddThreadMetadata(tweets, "alice")
+	if len(result) != 2 {
+		t.Fatalf("want 2 results, got %d", len(result))
+	}
+	byID := map[string]types.TweetWithMeta{}
+	for _, r := range result {
+		byID[r.ID] = r
+	}
+	if byID["A"].ThreadPosition != "root" {
+		t.Errorf("A should be root, got %q", byID["A"].ThreadPosition)
+	}
+	if byID["B"].ThreadPosition != "end" {
+		t.Errorf("B should be end, got %q", byID["B"].ThreadPosition)
+	}
+}
+
+func TestAddThreadMetadata_ConversationIDUsedForRootID(t *testing.T) {
+	tw := types.TweetData{
+		ID:             "1",
+		AuthorID:       "alice",
+		ConversationID: "conv-root",
+	}
+	result := parsing.AddThreadMetadata([]types.TweetData{tw}, "alice")
+	if len(result) != 1 {
+		t.Fatalf("want 1 result, got %d", len(result))
+	}
+	if result[0].ThreadRootID == nil || *result[0].ThreadRootID != "conv-root" {
+		t.Errorf("want ThreadRootID=conv-root, got %v", result[0].ThreadRootID)
+	}
+}
+
+func TestAddThreadMetadata_FallsBackToIDWhenNoConversationID(t *testing.T) {
+	tw := types.TweetData{
+		ID:       "1",
+		AuthorID: "alice",
+	}
+	result := parsing.AddThreadMetadata([]types.TweetData{tw}, "alice")
+	if len(result) != 1 {
+		t.Fatalf("want 1 result, got %d", len(result))
+	}
+	if result[0].ThreadRootID == nil || *result[0].ThreadRootID != "1" {
+		t.Errorf("want ThreadRootID=1 (fallback to ID), got %v", result[0].ThreadRootID)
+	}
+}
+
+func TestAddThreadMetadata_MixedAuthors_MultipleReplies(t *testing.T) {
+	tweets := []types.TweetData{
+		makeTweet("A", "alice", ""),
+		makeTweet("B", "alice", "A"),
+		makeTweet("C", "bob", "A"),
+		makeTweet("D", "alice", "B"),
+	}
+	result := parsing.AddThreadMetadata(tweets, "alice")
+	byID := map[string]types.TweetWithMeta{}
+	for _, r := range result {
+		byID[r.ID] = r
+	}
+	if byID["A"].ThreadPosition != "root" {
+		t.Errorf("A should be root, got %q", byID["A"].ThreadPosition)
+	}
+	if !byID["A"].HasSelfReplies {
+		t.Error("A should have self-replies (B)")
+	}
+	if byID["B"].ThreadPosition != "middle" {
+		t.Errorf("B should be middle, got %q", byID["B"].ThreadPosition)
+	}
+	if byID["D"].ThreadPosition != "end" {
+		t.Errorf("D should be end, got %q", byID["D"].ThreadPosition)
+	}
+}
+
+func TestFilterAuthorChain_BranchingThread(t *testing.T) {
+	tweets := []types.TweetData{
+		makeTweet("A", "alice", ""),
+		makeTweet("B", "alice", "A"),
+		makeTweet("C", "alice", "A"),
+	}
+	result := parsing.FilterAuthorChain(tweets, "alice")
+	if len(result) != 3 {
+		t.Errorf("want 3 tweets (A plus both branches), got %d", len(result))
+	}
+}
+
+func TestFilterAuthorChain_BreaksOnDifferentAuthorParent(t *testing.T) {
+	tweets := []types.TweetData{
+		makeTweet("A", "bob", ""),
+		makeTweet("B", "alice", "A"),
+		makeTweet("C", "alice", "B"),
+	}
+	result := parsing.FilterAuthorChain(tweets, "alice")
+	if len(result) != 2 {
+		t.Errorf("want 2 tweets (B and C; chain stops at bob's A), got %d", len(result))
+	}
+}
+
+func TestFilterAuthorOnly_PreservesOrder(t *testing.T) {
+	tweets := []types.TweetData{
+		makeTweet("1", "alice", ""),
+		makeTweet("2", "bob", ""),
+		makeTweet("3", "alice", ""),
+		makeTweet("4", "bob", ""),
+		makeTweet("5", "alice", ""),
+	}
+	result := parsing.FilterAuthorOnly(tweets, "alice")
+	if len(result) != 3 {
+		t.Fatalf("want 3 tweets, got %d", len(result))
+	}
+	if result[0].ID != "1" || result[1].ID != "3" || result[2].ID != "5" {
+		t.Errorf("order not preserved: got IDs %s, %s, %s", result[0].ID, result[1].ID, result[2].ID)
+	}
+}
+
+func TestAddThreadMetadata_EmptyReplyToStatusID(t *testing.T) {
+	emptyReply := ""
+	tw := types.TweetData{
+		ID:                "1",
+		AuthorID:          "alice",
+		InReplyToStatusID: &emptyReply,
+	}
+	result := parsing.AddThreadMetadata([]types.TweetData{tw}, "alice")
+	if len(result) != 1 {
+		t.Fatalf("want 1 result, got %d", len(result))
+	}
+	if result[0].ThreadPosition != "standalone" {
+		t.Errorf("tweet with empty InReplyToStatusID should be standalone, got %q", result[0].ThreadPosition)
+	}
+}

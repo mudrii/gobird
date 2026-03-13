@@ -1,0 +1,4 @@
+{
+  this is not valid json at all
+  "authToken": "missing-bracket
+}

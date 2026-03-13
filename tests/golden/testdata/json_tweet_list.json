@@ -1,0 +1,20 @@
+[
+  {
+    "id": "1001",
+    "text": "First tweet",
+    "likeCount": 10,
+    "author": {
+      "username": "alice",
+      "name": "Alice"
+    }
+  },
+  {
+    "id": "1002",
+    "text": "Second tweet",
+    "likeCount": 20,
+    "author": {
+      "username": "bob",
+      "name": "Bob"
+    }
+  }
+]

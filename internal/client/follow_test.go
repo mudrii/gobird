@@ -3,9 +3,9 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
-	"io"
 	"strings"
 	"testing"
 )

@@ -174,11 +174,11 @@ func TestBuildFollowingFeatures(t *testing.T) {
 	}
 	// Spot-check distinctive values from the hardcoded map.
 	checks := map[string]any{
-		"rweb_video_screen_enabled":                          true,
+		"rweb_video_screen_enabled":                            true,
 		"profile_label_improvements_pcf_label_in_post_enabled": false,
-		"premium_content_api_read_enabled":                   true,
-		"tweet_awards_web_tipping_enabled":                   true,
-		"responsive_web_grok_image_annotation_enabled":       false,
+		"premium_content_api_read_enabled":                     true,
+		"tweet_awards_web_tipping_enabled":                     true,
+		"responsive_web_grok_image_annotation_enabled":         false,
 	}
 	for k, want := range checks {
 		got, ok := f[k]

@@ -1,4 +1,4 @@
-// Package main is the entry point for the bird CLI.
+// Package main is the entry point for the gobird CLI.
 package main
 
 import (

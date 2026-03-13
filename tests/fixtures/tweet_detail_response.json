@@ -1,0 +1,32 @@
+{
+  "data": {
+    "tweetResult": {
+      "result": {
+        "__typename": "Tweet",
+        "rest_id": "3001",
+        "is_blue_verified": true,
+        "core": {
+          "user_results": {
+            "result": {
+              "__typename": "User",
+              "rest_id": "u500",
+              "legacy": {
+                "screen_name": "tweetauthor",
+                "name": "Tweet Author"
+              }
+            }
+          }
+        },
+        "legacy": {
+          "full_text": "This is a detailed tweet with some content for testing.",
+          "created_at": "Wed Jan 03 15:30:00 +0000 2024",
+          "conversation_id_str": "3001",
+          "reply_count": 12,
+          "retweet_count": 45,
+          "favorite_count": 200,
+          "user_id_str": "u500"
+        }
+      }
+    }
+  }
+}

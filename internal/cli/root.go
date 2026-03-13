@@ -1,10 +1,13 @@
-// Package cli implements the bird command-line interface.
+// Package cli implements the gobird command-line interface.
 package cli
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/mudrii/gobird/pkg/bird"
 	"github.com/spf13/cobra"
 )
 
@@ -47,7 +50,7 @@ func SetBuildInfo(version, sha string) {
 // NewRootCmd constructs and returns the root cobra command.
 func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:           "bird",
+		Use:           "gobird",
 		Short:         "Twitter/X CLI and Go client library",
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -124,9 +127,25 @@ func NewRootCmd() *cobra.Command {
 }
 
 // ExitCode maps CLI failures to the documented exit-code classes.
+//
+//	0 = success
+//	1 = runtime error (API, network, auth)
+//	2 = usage error (bad flags, bad arguments)
+//	3 = auth failure (401/403)
+//	4 = rate limit (429)
 func ExitCode(err error) int {
 	if err == nil {
 		return 0
+	}
+	// Check sentinel errors from the bird package.
+	if errors.Is(err, bird.ErrUnauthorized) || errors.Is(err, bird.ErrMissingCredentials) {
+		return 3
+	}
+	if errors.Is(err, bird.ErrRateLimit) {
+		return 4
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return 1
 	}
 	msg := err.Error()
 	switch {

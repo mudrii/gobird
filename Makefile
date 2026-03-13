@@ -2,13 +2,13 @@ VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "de
 GIT_SHA  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 LDFLAGS  := -X main.version=$(VERSION) -X main.gitSHA=$(GIT_SHA)
 BUILD    := go build -ldflags "$(LDFLAGS)"
-BINARY   := bin/bird
+BINARY   := bin/gobird
 
 .PHONY: build test test-race lint vet fmt clean coverage ci
 
 build:
 	@mkdir -p bin
-	$(BUILD) -o $(BINARY) ./cmd/bird
+	$(BUILD) -o $(BINARY) ./cmd/gobird
 
 test:
 	go test ./...

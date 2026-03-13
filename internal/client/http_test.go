@@ -3,8 +3,13 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
+	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/mudrii/gobird/internal/testutil"
@@ -232,5 +237,310 @@ func TestGraphqlURL_Encoding(t *testing.T) {
 	wantSuffix := "/testQID/CreateTweet"
 	if len(u) < len(wantSuffix) || u[len(u)-len(wantSuffix):] != wantSuffix {
 		t.Errorf("graphqlURL: want suffix %q, got %q", wantSuffix, u)
+	}
+}
+
+func TestDoGET_ServerError(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+	}{
+		{"500", 500},
+		{"502", 502},
+		{"503", 503},
+		{"400", 400},
+		{"401", 401},
+		{"403", 403},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := testutil.NewTestServer(testutil.StaticHandler(tt.statusCode, `{"error":"test"}`))
+			defer srv.Close()
+
+			c := newBareTestClient(srv.URL)
+			_, err := c.doGET(context.Background(), srv.URL+"/err", c.getJSONHeaders())
+			if err == nil {
+				t.Fatalf("expected error for HTTP %d", tt.statusCode)
+			}
+			var he *httpError
+			if !errors.As(err, &he) {
+				t.Fatalf("expected *httpError, got %T", err)
+			}
+			if he.StatusCode != tt.statusCode {
+				t.Errorf("status: want %d, got %d", tt.statusCode, he.StatusCode)
+			}
+		})
+	}
+}
+
+func TestDoGET_EmptyResponseBody(t *testing.T) {
+	srv := testutil.NewTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	c := newBareTestClient(srv.URL)
+	body, err := c.doGET(context.Background(), srv.URL+"/empty", c.getJSONHeaders())
+	if err != nil {
+		t.Fatalf("doGET: unexpected error: %v", err)
+	}
+	if len(body) != 0 {
+		t.Errorf("expected empty body, got %d bytes", len(body))
+	}
+}
+
+func TestDoPOSTForm_Success(t *testing.T) {
+	var gotContentType string
+	var gotBody string
+	srv := testutil.NewTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotContentType = r.Header.Get("Content-Type")
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(200)
+		w.Write([]byte(`{"ok":true}`))
+	}))
+	defer srv.Close()
+
+	c := newBareTestClient(srv.URL)
+	body, err := c.doPOSTForm(context.Background(), srv.URL+"/form", c.getBaseHeaders(), "key=val&other=123")
+	if err != nil {
+		t.Fatalf("doPOSTForm: %v", err)
+	}
+	if gotContentType != "application/x-www-form-urlencoded" {
+		t.Errorf("content-type: want application/x-www-form-urlencoded, got %q", gotContentType)
+	}
+	if gotBody != "key=val&other=123" {
+		t.Errorf("body: want key=val&other=123, got %q", gotBody)
+	}
+	if len(body) == 0 {
+		t.Error("expected non-empty response")
+	}
+}
+
+func TestDoPOSTForm_ServerError(t *testing.T) {
+	srv := testutil.NewTestServer(testutil.StaticHandler(500, `{"error":"boom"}`))
+	defer srv.Close()
+
+	c := newBareTestClient(srv.URL)
+	_, err := c.doPOSTForm(context.Background(), srv.URL+"/form", c.getBaseHeaders(), "data=1")
+	if err == nil {
+		t.Fatal("expected error on 500")
+	}
+}
+
+func TestIs404_edgeCases(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil error", nil, false},
+		{"non-httpError", errors.New("other"), false},
+		{"httpError 200", &httpError{StatusCode: 200, Body: ""}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := is404(tt.err)
+			if got != tt.want {
+				t.Errorf("is404(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHttpError_ErrorMessage(t *testing.T) {
+	he := &httpError{StatusCode: 429, Body: "rate limited"}
+	msg := he.Error()
+	if !strings.Contains(msg, "429") {
+		t.Errorf("error should contain status code, got: %s", msg)
+	}
+	if !strings.Contains(msg, "rate limited") {
+		t.Errorf("error should contain body, got: %s", msg)
+	}
+}
+
+func TestHttpError_LongBodyTruncated(t *testing.T) {
+	longBody := strings.Repeat("x", 300)
+	he := &httpError{StatusCode: 500, Body: longBody}
+	msg := he.Error()
+	if len(msg) > 250 {
+		// 200 chars body + "HTTP 500: " prefix + truncation marker
+		if !strings.Contains(msg, "…") {
+			t.Error("long body should be truncated with ellipsis")
+		}
+	}
+}
+
+func TestRetryableStatus(t *testing.T) {
+	tests := []struct {
+		code int
+		want bool
+	}{
+		{200, false},
+		{400, false},
+		{401, false},
+		{403, false},
+		{404, false},
+		{429, true},
+		{500, true},
+		{502, true},
+		{503, true},
+		{504, true},
+	}
+	for _, tt := range tests {
+		got := retryableStatus(tt.code)
+		if got != tt.want {
+			t.Errorf("retryableStatus(%d) = %v, want %v", tt.code, got, tt.want)
+		}
+	}
+}
+
+func TestFetchWithRetry_NonRetryableErrorNoRetry(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.WriteHeader(403)
+		w.Write([]byte(`{"error":"forbidden"}`))
+	}))
+	defer srv.Close()
+
+	c := newBareTestClient(srv.URL)
+	_, err := c.fetchWithRetry(context.Background(), srv.URL+"/data", c.getJSONHeaders())
+	if err == nil {
+		t.Fatal("expected error for 403")
+	}
+	if calls != 1 {
+		t.Errorf("403 should not be retried, want 1 call, got %d", calls)
+	}
+}
+
+func TestFetchWithRetry_ContextCancelledDuringRetry(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.Header().Set("retry-after", "0")
+		w.WriteHeader(500)
+		w.Write([]byte(`{"error":"fail"}`))
+	}))
+	defer srv.Close()
+
+	c := newBareTestClient(srv.URL)
+	ctx, cancel := context.WithCancel(context.Background())
+	// Cancel after first call completes — the retry delay select should pick up cancellation.
+	go func() {
+		for calls.Load() < 1 {
+			runtime.Gosched()
+		}
+		cancel()
+	}()
+
+	_, err := c.fetchWithRetry(ctx, srv.URL+"/data", c.getJSONHeaders())
+	if err == nil {
+		t.Fatal("expected error when context cancelled during retry")
+	}
+}
+
+func TestFetchWithRetry_RetryAfterHeader(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		if calls == 1 {
+			w.Header().Set("retry-after", "0")
+			w.WriteHeader(429)
+			w.Write([]byte(`{"error":"rate limited"}`))
+			return
+		}
+		w.WriteHeader(200)
+		w.Write([]byte(`{"ok":true}`))
+	}))
+	defer srv.Close()
+
+	c := newBareTestClient(srv.URL)
+	body, err := c.fetchWithRetry(context.Background(), srv.URL+"/data", c.getJSONHeaders())
+	if err != nil {
+		t.Fatalf("expected success after retry, got: %v", err)
+	}
+	if calls != 2 {
+		t.Errorf("want 2 calls, got %d", calls)
+	}
+	if len(body) == 0 {
+		t.Error("expected non-empty body")
+	}
+}
+
+func TestParseGraphQLErrors_InvalidJSON(t *testing.T) {
+	errs := parseGraphQLErrors([]byte(`not json`))
+	if len(errs) != 0 {
+		t.Errorf("invalid JSON should return nil errors, got %d", len(errs))
+	}
+}
+
+func TestParseGraphQLErrors_EmptyErrorsArray(t *testing.T) {
+	errs := parseGraphQLErrors([]byte(`{"errors":[]}`))
+	if len(errs) != 0 {
+		t.Errorf("empty errors array should return empty slice, got %d", len(errs))
+	}
+}
+
+func TestParseGraphQLErrors_NilBody(t *testing.T) {
+	errs := parseGraphQLErrors(nil)
+	if len(errs) != 0 {
+		t.Errorf("nil body should return nil, got %d", len(errs))
+	}
+}
+
+func TestGraphQLError_WithErrors(t *testing.T) {
+	body := []byte(`{"errors":[{"message":"bad query"}]}`)
+	err := graphQLError(body, "TestOp")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "TestOp") {
+		t.Errorf("error should contain operation name, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "bad query") {
+		t.Errorf("error should contain message, got: %v", err)
+	}
+}
+
+func TestGraphQLError_NoErrors(t *testing.T) {
+	body := []byte(`{"data":{}}`)
+	err := graphQLError(body, "TestOp")
+	if err != nil {
+		t.Errorf("expected nil error, got: %v", err)
+	}
+}
+
+func TestGraphqlURL_format(t *testing.T) {
+	tests := []struct {
+		op      string
+		queryID string
+		want    string
+	}{
+		{"CreateTweet", "abc123", GraphQLBaseURL + "/abc123/CreateTweet"},
+		{"SearchTimeline", "xyz", GraphQLBaseURL + "/xyz/SearchTimeline"},
+		{"", "", GraphQLBaseURL + "//"},
+	}
+	for _, tt := range tests {
+		got := graphqlURL(tt.op, tt.queryID)
+		if got != tt.want {
+			t.Errorf("graphqlURL(%q, %q) = %q, want %q", tt.op, tt.queryID, got, tt.want)
+		}
+	}
+}
+
+func TestDoPOSTJSON_ContextCancelled(t *testing.T) {
+	srv := testutil.NewTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	c := newBareTestClient(srv.URL)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := c.doPOSTJSON(ctx, srv.URL+"/post", c.getJSONHeaders(), map[string]string{"k": "v"})
+	if err == nil {
+		t.Fatal("expected error for cancelled context")
 	}
 }

@@ -33,7 +33,11 @@ func (c *Client) getCurrentUser(ctx context.Context) (*types.CurrentUserResult, 
 	}
 	for _, rawURL := range apiURLs {
 		if u := c.tryGetCurrentUserFromAPI(ctx, rawURL); u != nil {
-			c.userID = u.ID
+			c.userIDMu.Lock()
+			if c.userID == "" {
+				c.userID = u.ID
+			}
+			c.userIDMu.Unlock()
 			return u, nil
 		}
 	}
@@ -41,7 +45,11 @@ func (c *Client) getCurrentUser(ctx context.Context) (*types.CurrentUserResult, 
 	htmlPages := []string{SettingsPageURL, SettingsPageTwitterURL}
 	for _, rawURL := range htmlPages {
 		if u := c.tryGetCurrentUserFromHTML(ctx, rawURL); u != nil {
-			c.userID = u.ID
+			c.userIDMu.Lock()
+			if c.userID == "" {
+				c.userID = u.ID
+			}
+			c.userIDMu.Unlock()
 			return u, nil
 		}
 	}

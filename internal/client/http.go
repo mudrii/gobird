@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -31,11 +32,12 @@ func (e *httpError) Error() string {
 // is404 reports whether err is an HTTP 404 error.
 func is404(err error) bool {
 	var he *httpError
-	if e, ok := err.(*httpError); ok {
-		he = e
+	if !errors.As(err, &he) {
+		return false
 	}
-	return he != nil && he.StatusCode == 404
+	return he.StatusCode == 404
 }
+
 
 // doGET performs a GET request with the given headers and returns the response body.
 func (c *Client) doGET(ctx context.Context, url string, headers http.Header) ([]byte, error) {
@@ -87,12 +89,12 @@ func (c *Client) doPOSTForm(ctx context.Context, url string, headers http.Header
 func (c *Client) do(req *http.Request) ([]byte, error) {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s %s: %w", req.Method, req.URL.Path, err)
 	}
 	defer resp.Body.Close() //nolint:errcheck
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s %s: read body: %w", req.Method, req.URL.Path, err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, &httpError{StatusCode: resp.StatusCode, Body: string(body)}

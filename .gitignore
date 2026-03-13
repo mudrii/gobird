@@ -1,4 +1,5 @@
 bin/
 coverage.out
 coverage.html
+/gobird
 /bird

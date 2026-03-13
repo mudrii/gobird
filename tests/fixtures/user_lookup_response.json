@@ -1,0 +1,20 @@
+{
+  "data": {
+    "user": {
+      "result": {
+        "__typename": "User",
+        "rest_id": "u500",
+        "is_blue_verified": true,
+        "legacy": {
+          "screen_name": "tweetauthor",
+          "name": "Tweet Author",
+          "description": "A prolific tweet author for testing purposes.",
+          "followers_count": 15000,
+          "friends_count": 500,
+          "profile_image_url_https": "https://pbs.twimg.com/profile_images/example/photo.jpg",
+          "created_at": "Mon Mar 15 08:00:00 +0000 2010"
+        }
+      }
+    }
+  }
+}

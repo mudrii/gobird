@@ -356,9 +356,6 @@ func TestParseTweetsFromInstructions_ZeroItemsWithCursor(t *testing.T) {
 		},
 	}
 	tweets := parsing.ParseTweetsFromInstructions(instructions)
-	if tweets == nil {
-		// nil is acceptable; length 0 is what matters.
-	}
 	if len(tweets) != 0 {
 		t.Errorf("want 0 tweets when only cursor entry present, got %d", len(tweets))
 	}
@@ -764,5 +761,251 @@ func TestParseNewsItemFromContent_IsAiNewsBool_Robustness(t *testing.T) {
 	}
 	if !got.IsAiNews {
 		t.Error("want IsAiNews=true from bool value")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional robustness edge cases for malformed API responses
+// ---------------------------------------------------------------------------
+
+func TestMapTweetResult_EmptyRestID(t *testing.T) {
+	raw := &types.WireRawTweet{
+		RestID: "",
+		Legacy: &types.WireTweetLegacy{FullText: "text with no id"},
+	}
+	td := parsing.MapTweetResult(raw)
+	if td == nil {
+		t.Fatal("want non-nil TweetData even with empty RestID")
+	}
+	if td.ID != "" {
+		t.Errorf("want empty ID, got %q", td.ID)
+	}
+}
+
+func TestMapTweetResult_AllNilOptionalFields(t *testing.T) {
+	raw := &types.WireRawTweet{
+		RestID:       "allnil1",
+		Core:         nil,
+		Legacy:       nil,
+		Card:         nil,
+		QuotedResult: nil,
+		NoteTweet:    nil,
+		Article:      nil,
+	}
+	td := parsing.MapTweetResult(raw)
+	if td == nil {
+		t.Fatal("want non-nil TweetData")
+	}
+	if td.ID != "allnil1" {
+		t.Errorf("want ID allnil1, got %q", td.ID)
+	}
+	if td.Text != "" {
+		t.Errorf("want empty text, got %q", td.Text)
+	}
+	if td.Author.Username != "" || td.Author.Name != "" {
+		t.Errorf("want empty author, got %+v", td.Author)
+	}
+	if td.Media != nil {
+		t.Errorf("want nil media, got %v", td.Media)
+	}
+	if td.QuotedTweet != nil {
+		t.Errorf("want nil quoted tweet, got %+v", td.QuotedTweet)
+	}
+	if td.Article != nil {
+		t.Errorf("want nil article, got %+v", td.Article)
+	}
+}
+
+func TestExtractTweetText_AllSourcesEmpty(t *testing.T) {
+	raw := &types.WireRawTweet{
+		RestID:    "empty1",
+		Legacy:    &types.WireTweetLegacy{FullText: ""},
+		NoteTweet: &types.WireNoteTweet{NoteTweetResults: types.WireNoteTweetResults{Result: &types.WireNoteTweetResult{Text: ""}}},
+		Article:   &types.WireArticle{ArticleResults: types.WireArticleResults{Result: &types.WireArticleResult{}}},
+	}
+	got := parsing.ExtractTweetText(raw)
+	if got != "" {
+		t.Errorf("want empty text when all sources are empty, got %q", got)
+	}
+}
+
+func TestMapTweetResult_NegativeQuoteDepth(t *testing.T) {
+	quoted := &types.WireRawTweet{
+		RestID: "q-neg",
+		Legacy: &types.WireTweetLegacy{FullText: "quoted"},
+	}
+	raw := &types.WireRawTweet{
+		RestID:       "outer-neg",
+		Legacy:       &types.WireTweetLegacy{FullText: "outer"},
+		QuotedResult: &types.WireTweetResult{Result: quoted},
+	}
+	td := parsing.MapTweetResultWithOptions(raw, parsing.TweetParseOptions{QuoteDepth: -1})
+	if td == nil {
+		t.Fatal("want non-nil TweetData")
+	}
+	if td.QuotedTweet != nil {
+		t.Error("negative QuoteDepth should prevent quoted tweet expansion")
+	}
+}
+
+func TestMapTweetResult_LegacyWithZeroValueCounts(t *testing.T) {
+	raw := &types.WireRawTweet{
+		RestID: "zerocounts",
+		Legacy: &types.WireTweetLegacy{
+			FullText:      "zero counts",
+			ReplyCount:    0,
+			RetweetCount:  0,
+			FavoriteCount: 0,
+		},
+	}
+	td := parsing.MapTweetResult(raw)
+	if td.ReplyCount != 0 || td.RetweetCount != 0 || td.LikeCount != 0 {
+		t.Errorf("want all zero counts, got reply=%d rt=%d like=%d",
+			td.ReplyCount, td.RetweetCount, td.LikeCount)
+	}
+}
+
+func TestMapTweetResult_VeryLongText(t *testing.T) {
+	longText := ""
+	for i := 0; i < 10000; i++ {
+		longText += "a"
+	}
+	raw := &types.WireRawTweet{
+		RestID: "long1",
+		Legacy: &types.WireTweetLegacy{FullText: longText},
+	}
+	td := parsing.MapTweetResult(raw)
+	if td == nil {
+		t.Fatal("want non-nil TweetData")
+	}
+	if len(td.Text) != 10000 {
+		t.Errorf("want text length 10000, got %d", len(td.Text))
+	}
+}
+
+func TestMapTweetResult_CoreWithNilUserResult(t *testing.T) {
+	raw := &types.WireRawTweet{
+		RestID: "corenil",
+		Legacy: &types.WireTweetLegacy{FullText: "text"},
+		Core: &types.WireTweetCore{
+			UserResults: types.WireUserResult{Result: nil},
+		},
+	}
+	td := parsing.MapTweetResult(raw)
+	if td == nil {
+		t.Fatal("want non-nil TweetData")
+	}
+	if td.Author.Username != "" {
+		t.Errorf("want empty username when UserResult is nil, got %q", td.Author.Username)
+	}
+}
+
+func TestCollectTweetResultsFromEntry_ModuleItemNilItemContent(t *testing.T) {
+	entry := &types.WireEntry{
+		Content: types.WireContent{
+			Items: []types.WireItem{
+				{Item: struct {
+					ItemContent *types.WireItemContent `json:"itemContent"`
+				}{ItemContent: nil}},
+			},
+		},
+	}
+	results := parsing.CollectTweetResultsFromEntry(entry)
+	if len(results) != 0 {
+		t.Errorf("want 0 results for nil ItemContent in module item, got %d", len(results))
+	}
+}
+
+func TestExtractCursorFromInstructions_MultipleCursors_FirstWins(t *testing.T) {
+	instructions := []types.WireTimelineInstruction{
+		{
+			Entries: []types.WireEntry{
+				{Content: types.WireContent{CursorType: "Bottom", Value: "first-cursor"}},
+				{Content: types.WireContent{CursorType: "Bottom", Value: "second-cursor"}},
+			},
+		},
+	}
+	got := parsing.ExtractCursorFromInstructions(instructions)
+	if got != "first-cursor" {
+		t.Errorf("want first Bottom cursor, got %q", got)
+	}
+}
+
+func TestExtractCursorFromInstructions_EntriesTakesPriorityOverEntry(t *testing.T) {
+	instructions := []types.WireTimelineInstruction{
+		{
+			Entries: []types.WireEntry{
+				{Content: types.WireContent{CursorType: "Bottom", Value: "entries-cursor"}},
+			},
+			Entry: &types.WireEntry{
+				Content: types.WireContent{CursorType: "Bottom", Value: "entry-cursor"},
+			},
+		},
+	}
+	got := parsing.ExtractCursorFromInstructions(instructions)
+	if got != "entries-cursor" {
+		t.Errorf("Entries should be checked before Entry, got %q", got)
+	}
+}
+
+func TestParseUsersFromInstructions_NilResultInsideUserResult(t *testing.T) {
+	instructions := []types.WireTimelineInstruction{
+		{
+			Entries: []types.WireEntry{
+				{
+					Content: types.WireContent{
+						ItemContent: &types.WireItemContent{
+							UserResult: &types.WireUserResult{Result: nil},
+						},
+					},
+				},
+			},
+		},
+	}
+	users := parsing.ParseUsersFromInstructions(instructions)
+	if len(users) != 0 {
+		t.Errorf("want 0 users for nil Result inside UserResult, got %d", len(users))
+	}
+}
+
+func TestMapList_EmptyFields(t *testing.T) {
+	raw := &types.WireList{
+		IDStr:       "",
+		Name:        "",
+		Description: "",
+		MemberCount: 0,
+		Mode:        "",
+	}
+	l := parsing.MapList(raw)
+	if l == nil {
+		t.Fatal("want non-nil list even with all empty fields")
+	}
+	if l.IsPrivate {
+		t.Error("empty mode should not be treated as private")
+	}
+}
+
+func TestParseNewsItemFromContent_WrongTypes(t *testing.T) {
+	content := map[string]any{
+		"id":          123,
+		"headline":    true,
+		"tweet_count": "not a number",
+		"is_ai_news":  "not a bool",
+	}
+	got := parsing.ParseNewsItemFromContent(content)
+	if got == nil {
+		t.Fatal("want non-nil item even with wrong types")
+	}
+	if got.ID != "" {
+		t.Errorf("want empty ID for non-string id, got %q", got.ID)
+	}
+	if got.Headline != "" {
+		t.Errorf("want empty headline for non-string headline, got %q", got.Headline)
+	}
+	if got.PostCount != nil {
+		t.Errorf("want nil PostCount for non-float64, got %v", got.PostCount)
+	}
+	if got.IsAiNews {
+		t.Error("want false IsAiNews for non-bool value")
 	}
 }

@@ -407,7 +407,7 @@ func TestClient_GetUserTweets_Wrapper(t *testing.T) {
 									"type": "TimelineAddEntries",
 									"entries": []any{
 										map[string]any{
-											"entryId": "tweet-ut1",
+											"entryId":   "tweet-ut1",
 											"sortIndex": "1",
 											"content": map[string]any{
 												"entryType": "TimelineTimelineItem",
@@ -468,7 +468,7 @@ func TestClient_GetUserTweetsPaged_Wrapper(t *testing.T) {
 									"type": "TimelineAddEntries",
 									"entries": []any{
 										map[string]any{
-											"entryId": "tweet-up1",
+											"entryId":   "tweet-up1",
 											"sortIndex": "1",
 											"content": map[string]any{
 												"entryType": "TimelineTimelineItem",
@@ -590,7 +590,7 @@ func TestClient_GetReplies_Wrapper(t *testing.T) {
 						"type": "TimelineAddEntries",
 						"entries": []any{
 							map[string]any{
-								"entryId": "tweet-r1",
+								"entryId":   "tweet-r1",
 								"sortIndex": "2",
 								"content": map[string]any{
 									"entryType": "TimelineTimelineItem",
@@ -642,7 +642,7 @@ func TestClient_GetThread_Wrapper(t *testing.T) {
 						"type": "TimelineAddEntries",
 						"entries": []any{
 							map[string]any{
-								"entryId": "tweet-th1",
+								"entryId":   "tweet-th1",
 								"sortIndex": "1",
 								"content": map[string]any{
 									"entryType": "TimelineTimelineItem",
@@ -697,7 +697,7 @@ func TestClient_GetFollowing_Wrapper(t *testing.T) {
 									"type": "TimelineAddEntries",
 									"entries": []any{
 										map[string]any{
-											"entryId": "user-f1",
+											"entryId":   "user-f1",
 											"sortIndex": "1",
 											"content": map[string]any{
 												"entryType": "TimelineTimelineItem",
@@ -750,7 +750,7 @@ func TestClient_GetFollowers_Wrapper(t *testing.T) {
 									"type": "TimelineAddEntries",
 									"entries": []any{
 										map[string]any{
-											"entryId": "user-fr1",
+											"entryId":   "user-fr1",
 											"sortIndex": "1",
 											"content": map[string]any{
 												"entryType": "TimelineTimelineItem",
@@ -991,7 +991,7 @@ func TestClient_GetListTimeline_Wrapper(t *testing.T) {
 								"type": "TimelineAddEntries",
 								"entries": []any{
 									map[string]any{
-										"entryId": "tweet-lt1",
+										"entryId":   "tweet-lt1",
 										"sortIndex": "1",
 										"content": map[string]any{
 											"entryType": "TimelineTimelineItem",

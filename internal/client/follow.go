@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 )
@@ -136,8 +137,8 @@ func (e *followError) Error() string {
 // parseFollowRESTError inspects a REST error response and wraps it if it
 // contains a known follow error code.
 func parseFollowRESTError(err error) error {
-	he, ok := err.(*httpError)
-	if !ok {
+	var he *httpError
+	if !errors.As(err, &he) {
 		return err
 	}
 	var resp struct {
@@ -161,11 +162,11 @@ func parseFollowRESTError(err error) error {
 }
 
 func isFollowBlocked(err error) bool {
-	fe, ok := err.(*followError)
-	return ok && fe.Code == restErrBlocked
+	var fe *followError
+	return errors.As(err, &fe) && fe.Code == restErrBlocked
 }
 
 func isFollowNotFound(err error) bool {
-	fe, ok := err.(*followError)
-	return ok && fe.Code == restErrNotFound
+	var fe *followError
+	return errors.As(err, &fe) && fe.Code == restErrNotFound
 }

@@ -411,3 +411,341 @@ func TestTwitterUser_JSONRoundtrip(t *testing.T) {
 		t.Errorf("TwitterUser roundtrip mismatch: got %+v", got)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Additional model tests: defaults, validation, wire unmarshaling
+// ---------------------------------------------------------------------------
+
+func TestTwitterUser_ZeroValue_OmitemptyFields(t *testing.T) {
+	u := types.TwitterUser{
+		ID:       "zero-user",
+		Username: "u",
+		Name:     "N",
+	}
+	data, err := json.Marshal(u)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	for _, field := range []string{"description", "followersCount", "followingCount",
+		"isBlueVerified", "profileImageUrl", "createdAt", "_raw"} {
+		if _, ok := raw[field]; ok {
+			t.Errorf("zero-value field %q should be absent (omitempty)", field)
+		}
+	}
+}
+
+func TestTwitterList_JSONRoundtrip(t *testing.T) {
+	owner := &types.ListOwner{ID: "o1", Username: "owner", Name: "Owner"}
+	orig := types.TwitterList{
+		ID:              "list-1",
+		Name:            "Test List",
+		Description:     "A test list",
+		MemberCount:     50,
+		SubscriberCount: 10,
+		IsPrivate:       true,
+		CreatedAt:       "2024-01-01",
+		Owner:           owner,
+	}
+	data, err := json.Marshal(orig)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var got types.TwitterList
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if got.ID != orig.ID {
+		t.Errorf("ID: want %q, got %q", orig.ID, got.ID)
+	}
+	if got.Name != orig.Name {
+		t.Errorf("Name: want %q, got %q", orig.Name, got.Name)
+	}
+	if !got.IsPrivate {
+		t.Error("IsPrivate: want true")
+	}
+	if got.Owner == nil || got.Owner.ID != "o1" {
+		t.Errorf("Owner: want id o1, got %v", got.Owner)
+	}
+}
+
+func TestTwitterList_ZeroValue_OmitemptyFields(t *testing.T) {
+	l := types.TwitterList{
+		ID:   "empty-list",
+		Name: "E",
+	}
+	data, err := json.Marshal(l)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	for _, field := range []string{"description", "memberCount", "subscriberCount",
+		"isPrivate", "createdAt", "owner", "_raw"} {
+		if _, ok := raw[field]; ok {
+			t.Errorf("zero-value field %q should be absent (omitempty)", field)
+		}
+	}
+}
+
+func TestNewsItem_JSONRoundtrip(t *testing.T) {
+	count := 99
+	orig := types.NewsItem{
+		ID:          "news-1",
+		Headline:    "Breaking News",
+		Category:    "World",
+		TimeAgo:     "1h",
+		PostCount:   &count,
+		Description: "Full description",
+		URL:         "https://example.com/news",
+		IsAiNews:    true,
+	}
+	data, err := json.Marshal(orig)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var got types.NewsItem
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if got.ID != orig.ID {
+		t.Errorf("ID: want %q, got %q", orig.ID, got.ID)
+	}
+	if got.Headline != orig.Headline {
+		t.Errorf("Headline: want %q, got %q", orig.Headline, got.Headline)
+	}
+	if !got.IsAiNews {
+		t.Error("IsAiNews: want true")
+	}
+	if got.PostCount == nil || *got.PostCount != 99 {
+		t.Errorf("PostCount: want 99, got %v", got.PostCount)
+	}
+}
+
+func TestCurrentUserResult_JSONRoundtrip(t *testing.T) {
+	orig := types.CurrentUserResult{
+		ID:       "cu1",
+		Username: "currentuser",
+		Name:     "Current User",
+	}
+	data, err := json.Marshal(orig)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var got types.CurrentUserResult
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if got.ID != orig.ID || got.Username != orig.Username || got.Name != orig.Name {
+		t.Errorf("CurrentUserResult roundtrip mismatch: got %+v", got)
+	}
+}
+
+func TestCurrentUserResult_OmitemptyFields(t *testing.T) {
+	cur := types.CurrentUserResult{ID: "cu2"}
+	data, err := json.Marshal(cur)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	for _, field := range []string{"username", "name"} {
+		if _, ok := raw[field]; ok {
+			t.Errorf("zero-value field %q should be absent (omitempty)", field)
+		}
+	}
+}
+
+func TestWireResponse_UnmarshalPartialJSON(t *testing.T) {
+	input := `{"data":{"key":"value"}}`
+	var wr types.WireResponse
+	if err := json.Unmarshal([]byte(input), &wr); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if wr.Data == nil {
+		t.Fatal("Data should not be nil")
+	}
+	if wr.Data["key"] != "value" {
+		t.Errorf("Data[key]: want value, got %v", wr.Data["key"])
+	}
+	if wr.Errors != nil {
+		t.Errorf("Errors should be nil for response without errors, got %v", wr.Errors)
+	}
+}
+
+func TestWireResponse_UnmarshalWithErrors(t *testing.T) {
+	input := `{"data":null,"errors":[{"message":"rate limited","extensions":{"code":"RATE_LIMITED","retry_after":15}}]}`
+	var wr types.WireResponse
+	if err := json.Unmarshal([]byte(input), &wr); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if len(wr.Errors) != 1 {
+		t.Fatalf("want 1 error, got %d", len(wr.Errors))
+	}
+	if wr.Errors[0].Message != "rate limited" {
+		t.Errorf("Message: want %q, got %q", "rate limited", wr.Errors[0].Message)
+	}
+	if wr.Errors[0].Extensions.Code != "RATE_LIMITED" {
+		t.Errorf("Extensions.Code: want RATE_LIMITED, got %q", wr.Errors[0].Extensions.Code)
+	}
+	if wr.Errors[0].Extensions.RetryAfter == nil || *wr.Errors[0].Extensions.RetryAfter != 15 {
+		t.Errorf("RetryAfter: want 15, got %v", wr.Errors[0].Extensions.RetryAfter)
+	}
+}
+
+func TestWireResponse_UnmarshalMalformed(t *testing.T) {
+	var wr types.WireResponse
+	err := json.Unmarshal([]byte(`{invalid json`), &wr)
+	if err == nil {
+		t.Error("want error for malformed JSON")
+	}
+}
+
+func TestWireRawTweet_UnmarshalPartialJSON(t *testing.T) {
+	input := `{"__typename":"Tweet","rest_id":"123","is_blue_verified":true}`
+	var raw types.WireRawTweet
+	if err := json.Unmarshal([]byte(input), &raw); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if raw.TypeName != "Tweet" {
+		t.Errorf("TypeName: want Tweet, got %q", raw.TypeName)
+	}
+	if raw.RestID != "123" {
+		t.Errorf("RestID: want 123, got %q", raw.RestID)
+	}
+	if !raw.IsBlueVerified {
+		t.Error("IsBlueVerified: want true")
+	}
+	if raw.Legacy != nil {
+		t.Error("Legacy should be nil when not in JSON")
+	}
+	if raw.Core != nil {
+		t.Error("Core should be nil when not in JSON")
+	}
+}
+
+func TestWireRawUser_UnmarshalPartialJSON(t *testing.T) {
+	input := `{"__typename":"User","rest_id":"u1","is_blue_verified":false}`
+	var raw types.WireRawUser
+	if err := json.Unmarshal([]byte(input), &raw); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if raw.TypeName != "User" {
+		t.Errorf("TypeName: want User, got %q", raw.TypeName)
+	}
+	if raw.RestID != "u1" {
+		t.Errorf("RestID: want u1, got %q", raw.RestID)
+	}
+	if raw.Legacy != nil {
+		t.Error("Legacy should be nil when not in JSON")
+	}
+}
+
+func TestWireTimelineInstruction_UnmarshalWithEntry(t *testing.T) {
+	input := `{"type":"TimelineReplaceEntry","entry":{"entryId":"cursor-1","content":{"cursorType":"Bottom","value":"next"}}}`
+	var inst types.WireTimelineInstruction
+	if err := json.Unmarshal([]byte(input), &inst); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if inst.Type != "TimelineReplaceEntry" {
+		t.Errorf("Type: want TimelineReplaceEntry, got %q", inst.Type)
+	}
+	if inst.Entry == nil {
+		t.Fatal("Entry should not be nil")
+	}
+	if inst.Entry.Content.CursorType != "Bottom" {
+		t.Errorf("CursorType: want Bottom, got %q", inst.Entry.Content.CursorType)
+	}
+}
+
+func TestPageResult_ZeroValue(t *testing.T) {
+	var pr types.PageResult[types.TweetData]
+	if pr.Items != nil {
+		t.Error("zero-value Items should be nil")
+	}
+	if pr.NextCursor != "" {
+		t.Error("zero-value NextCursor should be empty")
+	}
+	if pr.Success {
+		t.Error("zero-value Success should be false")
+	}
+	if pr.Error != nil {
+		t.Error("zero-value Error should be nil")
+	}
+}
+
+func TestFetchOptions_Defaults(t *testing.T) {
+	var opts types.FetchOptions
+	if opts.Cursor != "" {
+		t.Error("default Cursor should be empty")
+	}
+	if opts.Count != 0 {
+		t.Error("default Count should be 0")
+	}
+	if opts.Limit != 0 {
+		t.Error("default Limit should be 0")
+	}
+	if opts.MaxPages != 0 {
+		t.Error("default MaxPages should be 0")
+	}
+	if opts.IncludeRaw {
+		t.Error("default IncludeRaw should be false")
+	}
+	if opts.QuoteDepth != 0 {
+		t.Error("default QuoteDepth should be 0")
+	}
+}
+
+func TestSearchOptions_EmbedsFetchOptions(t *testing.T) {
+	opts := types.SearchOptions{
+		FetchOptions: types.FetchOptions{
+			Count: 20,
+			Limit: 100,
+		},
+		Product: "Latest",
+	}
+	if opts.Count != 20 {
+		t.Errorf("Count: want 20, got %d", opts.Count)
+	}
+	if opts.Product != "Latest" {
+		t.Errorf("Product: want Latest, got %q", opts.Product)
+	}
+}
+
+func TestThreadOptions_FilterMode(t *testing.T) {
+	opts := types.ThreadOptions{
+		FilterMode: "author_chain",
+	}
+	if opts.FilterMode != "author_chain" {
+		t.Errorf("FilterMode: want author_chain, got %q", opts.FilterMode)
+	}
+}
+
+func TestTweetMedia_DurationMs_NilVsZero(t *testing.T) {
+	t.Run("nil duration omitted", func(t *testing.T) {
+		m := types.TweetMedia{Type: "photo", URL: "u"}
+		data, _ := json.Marshal(m)
+		var raw map[string]json.RawMessage
+		json.Unmarshal(data, &raw)
+		if _, ok := raw["durationMs"]; ok {
+			t.Error("nil durationMs should be omitted")
+		}
+	})
+	t.Run("zero duration included", func(t *testing.T) {
+		zero := 0
+		m := types.TweetMedia{Type: "gif", URL: "u", DurationMs: &zero}
+		data, _ := json.Marshal(m)
+		var raw map[string]json.RawMessage
+		json.Unmarshal(data, &raw)
+		if _, ok := raw["durationMs"]; !ok {
+			t.Error("zero durationMs (non-nil pointer) should be included")
+		}
+	})
+}

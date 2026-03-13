@@ -1,0 +1,86 @@
+{
+  "data": {
+    "search_by_raw_query": {
+      "search_timeline": {
+        "timeline": {
+          "instructions": [
+            {
+              "type": "TimelineAddEntries",
+              "entries": [
+                {
+                  "entryId": "tweet-2001",
+                  "content": {
+                    "itemContent": {
+                      "tweet_results": {
+                        "result": {
+                          "__typename": "Tweet",
+                          "rest_id": "2001",
+                          "is_blue_verified": false,
+                          "core": {
+                            "user_results": {
+                              "result": {
+                                "__typename": "User",
+                                "rest_id": "u300",
+                                "legacy": {
+                                  "screen_name": "searcher",
+                                  "name": "Searcher"
+                                }
+                              }
+                            }
+                          },
+                          "legacy": {
+                            "full_text": "Found this via search",
+                            "created_at": "Tue Jan 02 10:00:00 +0000 2024",
+                            "conversation_id_str": "2001",
+                            "reply_count": 1,
+                            "retweet_count": 3,
+                            "favorite_count": 20,
+                            "user_id_str": "u300"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "entryId": "tweet-2002",
+                  "content": {
+                    "itemContent": {
+                      "tweet_results": {
+                        "result": {
+                          "__typename": "Tweet",
+                          "rest_id": "2002",
+                          "core": {
+                            "user_results": {
+                              "result": {
+                                "__typename": "User",
+                                "rest_id": "u400",
+                                "legacy": {
+                                  "screen_name": "dev",
+                                  "name": "Developer"
+                                }
+                              }
+                            }
+                          },
+                          "legacy": {
+                            "full_text": "Another search result",
+                            "created_at": "Tue Jan 02 09:00:00 +0000 2024",
+                            "conversation_id_str": "2002",
+                            "reply_count": 0,
+                            "retweet_count": 1,
+                            "favorite_count": 5,
+                            "user_id_str": "u400"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

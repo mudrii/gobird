@@ -1,0 +1,8 @@
+{
+  // Valid test config
+  "authToken": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "ct0": "abcdefghijklmnopqrstuvwxyz012345",
+  "defaultBrowser": "safari",
+  "timeoutMs": 5000,
+  "quoteDepth": 2,
+}

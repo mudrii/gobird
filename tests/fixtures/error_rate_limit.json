@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "message": "Rate limit exceeded",
+      "code": 88
+    }
+  ]
+}

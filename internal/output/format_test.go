@@ -257,3 +257,208 @@ func TestFormatNewsItem_AiNews(t *testing.T) {
 		t.Errorf("AI badge not shown: %q", got)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Additional formatting edge cases
+// ---------------------------------------------------------------------------
+
+func TestFormatTweet_ZeroValueFields(t *testing.T) {
+	tw := types.TweetData{}
+	got := output.FormatTweet(tw, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "@") {
+		t.Errorf("should contain @ prefix even for empty username: %q", got)
+	}
+	if !strings.Contains(got, "replies: 0") {
+		t.Errorf("should show zero reply count: %q", got)
+	}
+	if !strings.Contains(got, "likes: 0") {
+		t.Errorf("should show zero like count: %q", got)
+	}
+	if !strings.Contains(got, "rts: 0") {
+		t.Errorf("should show zero retweet count: %q", got)
+	}
+}
+
+func TestFormatTweet_EmptyText(t *testing.T) {
+	tw := makeTweet("1", "", "user", "User", 0, 0)
+	got := output.FormatTweet(tw, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "@user") {
+		t.Errorf("handle should appear even with empty text: %q", got)
+	}
+}
+
+func TestFormatTweet_TextWithWhitespace(t *testing.T) {
+	tw := makeTweet("1", "  spaced out  ", "user", "User", 0, 0)
+	got := output.FormatTweet(tw, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if strings.Contains(got, "  spaced out  ") {
+		t.Errorf("text should be trimmed: %q", got)
+	}
+	if !strings.Contains(got, "spaced out") {
+		t.Errorf("trimmed text should be present: %q", got)
+	}
+}
+
+func TestFormatTweet_ArticleEmptyTitle(t *testing.T) {
+	tw := makeTweet("1", "text", "user", "User", 0, 0)
+	tw.Article = &types.TweetArticle{Title: ""}
+	got := output.FormatTweet(tw, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if strings.Contains(got, "[article:") {
+		t.Errorf("empty article title should not produce [article:] tag: %q", got)
+	}
+}
+
+func TestFormatTweet_EmptyMedia(t *testing.T) {
+	tw := makeTweet("1", "text", "user", "User", 0, 0)
+	tw.Media = []types.TweetMedia{}
+	got := output.FormatTweet(tw, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "@user") {
+		t.Errorf("should render normally with empty media slice: %q", got)
+	}
+}
+
+func TestFormatTweet_WithColor(t *testing.T) {
+	tw := makeTweet("1", "text", "user", "User", 0, 0)
+	got := output.FormatTweet(tw, output.FormatOptions{NoColor: false, NoEmoji: true})
+	if !strings.Contains(got, "\x1b[1m") {
+		t.Errorf("should contain bold ANSI escape when NoColor is false: %q", got)
+	}
+}
+
+func TestFormatTweet_WithEmoji(t *testing.T) {
+	tw := makeTweet("1", "text", "user", "User", 0, 0)
+	got := output.FormatTweet(tw, output.FormatOptions{NoColor: true, NoEmoji: false})
+	if !strings.HasPrefix(got, "\xf0\x9f\x90\xa6") { // bird emoji bytes
+		t.Errorf("should start with bird emoji when NoEmoji is false: %q", got)
+	}
+}
+
+func TestFormatUser_ZeroValueFields(t *testing.T) {
+	u := types.TwitterUser{}
+	got := output.FormatUser(u, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "@") {
+		t.Errorf("should contain @ even with empty username: %q", got)
+	}
+	if !strings.Contains(got, "followers:") {
+		t.Errorf("should contain followers label: %q", got)
+	}
+}
+
+func TestFormatUser_NotVerified(t *testing.T) {
+	u := types.TwitterUser{
+		Username:       "regular",
+		Name:           "Regular",
+		IsBlueVerified: false,
+	}
+	got := output.FormatUser(u, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if strings.Contains(got, "verified") || strings.Contains(got, "\xe2\x9c\x93") {
+		t.Errorf("unverified user should not have verified badge: %q", got)
+	}
+}
+
+func TestFormatUser_FollowerCountFormatting(t *testing.T) {
+	tests := []struct {
+		name     string
+		count    int
+		contains string
+	}{
+		{"small", 42, "42"},
+		{"thousands", 1500, "1.5K"},
+		{"millions", 2500000, "2.5M"},
+		{"exactly_1000", 1000, "1.0K"},
+		{"exactly_1M", 1000000, "1.0M"},
+		{"zero", 0, "0"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			u := types.TwitterUser{
+				Username:       "u",
+				Name:           "U",
+				FollowersCount: tc.count,
+			}
+			got := output.FormatUser(u, output.FormatOptions{NoColor: true, NoEmoji: true})
+			if !strings.Contains(got, tc.contains) {
+				t.Errorf("want %q in output, got %q", tc.contains, got)
+			}
+		})
+	}
+}
+
+func TestFormatList_ZeroMemberCount(t *testing.T) {
+	l := types.TwitterList{
+		ID:          "l1",
+		Name:        "Empty List",
+		MemberCount: 0,
+	}
+	got := output.FormatList(l, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "members: 0") {
+		t.Errorf("zero member count should be shown: %q", got)
+	}
+}
+
+func TestFormatList_NoOwner(t *testing.T) {
+	l := types.TwitterList{
+		ID:   "l2",
+		Name: "Ownerless",
+	}
+	got := output.FormatList(l, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if strings.Contains(got, "owner:") {
+		t.Errorf("should not show owner when nil: %q", got)
+	}
+}
+
+func TestFormatNewsItem_AllFieldsPopulated(t *testing.T) {
+	n := types.NewsItem{
+		ID:       "n5",
+		Headline: "Full news",
+		Category: "Tech",
+		URL:      "https://example.com",
+		IsAiNews: true,
+	}
+	got := output.FormatNewsItem(n, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "Full news") {
+		t.Errorf("missing headline: %q", got)
+	}
+	if !strings.Contains(got, "(Tech)") {
+		t.Errorf("missing category: %q", got)
+	}
+	if !strings.Contains(got, "https://example.com") {
+		t.Errorf("missing URL: %q", got)
+	}
+	if !strings.Contains(got, "[AI]") {
+		t.Errorf("missing AI badge: %q", got)
+	}
+}
+
+func TestFormatNewsItem_EmptyFields(t *testing.T) {
+	n := types.NewsItem{Headline: "Just headline"}
+	got := output.FormatNewsItem(n, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if strings.Contains(got, "(") {
+		t.Errorf("no category should mean no parens: %q", got)
+	}
+	if strings.Contains(got, "[") && !strings.Contains(got, "[AI]") {
+		t.Errorf("no URL should mean no brackets: %q", got)
+	}
+}
+
+func TestFormatNewsItem_AiNewsWithEmoji(t *testing.T) {
+	n := types.NewsItem{
+		Headline: "AI stuff",
+		IsAiNews: true,
+	}
+	got := output.FormatNewsItem(n, output.FormatOptions{NoColor: true, NoEmoji: false})
+	if !strings.Contains(got, "\xf0\x9f\xa4\x96") { // robot emoji bytes
+		t.Errorf("AI news with emoji enabled should show robot emoji: %q", got)
+	}
+}
+
+func TestFormatUser_VerifiedWithEmoji(t *testing.T) {
+	u := types.TwitterUser{
+		Username:       "vuser",
+		Name:           "V",
+		IsBlueVerified: true,
+	}
+	got := output.FormatUser(u, output.FormatOptions{NoColor: true, NoEmoji: false})
+	if !strings.Contains(got, "\xe2\x9c\x93") { // checkmark bytes
+		t.Errorf("verified user with emoji should show checkmark: %q", got)
+	}
+}

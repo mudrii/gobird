@@ -105,8 +105,8 @@ func (c *Client) fetchUserByScreenName(ctx context.Context, username string) (*t
 	fieldToggles := buildUserByScreenNameFieldToggles()
 
 	vars := map[string]any{
-		"screen_name":                username,
-		"withSafetyModeUserFields":   true,
+		"screen_name":              username,
+		"withSafetyModeUserFields": true,
 	}
 
 	varsJSON, err := json.Marshal(vars)
@@ -216,15 +216,15 @@ func parseUserByScreenNameResponse(body []byte, _ string) (*types.TwitterUser, b
 // parseRESTUserShowResponse parses the REST users/show.json response.
 func parseRESTUserShowResponse(body []byte) (*types.TwitterUser, error) {
 	var v struct {
-		IDStr          string `json:"id_str"`
-		ScreenName     string `json:"screen_name"`
-		Name           string `json:"name"`
-		Description    string `json:"description"`
-		FollowersCount int    `json:"followers_count"`
-		FriendsCount   int    `json:"friends_count"`
+		IDStr                string `json:"id_str"`
+		ScreenName           string `json:"screen_name"`
+		Name                 string `json:"name"`
+		Description          string `json:"description"`
+		FollowersCount       int    `json:"followers_count"`
+		FriendsCount         int    `json:"friends_count"`
 		ProfileImageURLHTTPS string `json:"profile_image_url_https"`
-		CreatedAt      string `json:"created_at"`
-		Verified       bool   `json:"verified"`
+		CreatedAt            string `json:"created_at"`
+		Verified             bool   `json:"verified"`
 	}
 	if err := json.Unmarshal(body, &v); err != nil {
 		return nil, err

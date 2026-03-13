@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -150,7 +151,8 @@ func (c *Client) Search(ctx context.Context, q string, opts *types.SearchOptions
 
 			// Check for HTTP 400/422 with GRAPHQL_VALIDATION_FAILED in body or error.
 			shouldRefresh := false
-			if he, ok := lastErr.(*httpError); ok {
+			var he *httpError
+			if errors.As(lastErr, &he) {
 				if (he.StatusCode == 400 || he.StatusCode == 422) &&
 					strings.Contains(he.Body, "GRAPHQL_VALIDATION_FAILED") {
 					shouldRefresh = true
@@ -219,7 +221,8 @@ func (c *Client) GetAllSearchResults(ctx context.Context, q string, opts *types.
 				lastErr = result.err
 
 				shouldRefresh := false
-				if he, ok := lastErr.(*httpError); ok {
+				var he *httpError
+				if errors.As(lastErr, &he) {
 					if (he.StatusCode == 400 || he.StatusCode == 422) &&
 						strings.Contains(he.Body, "GRAPHQL_VALIDATION_FAILED") {
 						shouldRefresh = true

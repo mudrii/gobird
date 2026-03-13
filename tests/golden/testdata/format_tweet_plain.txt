@@ -1,0 +1,1 @@
+@goldenuser: Hello from the golden test! (replies: 5, likes: 100, rts: 10)

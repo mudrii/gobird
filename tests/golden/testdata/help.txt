@@ -1,0 +1,60 @@
+Twitter/X CLI and Go client library
+
+Usage:
+  gobird [flags]
+  gobird [command]
+
+Available Commands:
+  about         Show account info for a user
+  bookmarks     Fetch bookmarks
+  check         Validate credentials and print current user
+  completion    Generate the autocompletion script for the specified shell
+  follow        Follow a user
+  followers     List followers of the given account
+  following     List users the given account follows
+  help          Help about any command
+  home          Fetch home timeline
+  likes         Fetch tweets liked by the current user
+  list-timeline Fetch timeline for a list
+  lists         List owned lists (or memberships with --memberships)
+  mentions      Fetch mentions of a user
+  news          Fetch news from explore tabs
+  query-ids     Print the current fallback query ID cache
+  read          Read a single tweet
+  replies       Fetch replies to a tweet
+  reply         Reply to a tweet
+  search        Search tweets
+  thread        Fetch a tweet thread
+  trending      Fetch trending topics
+  tweet         Post a new tweet
+  unbookmark    Remove a tweet from bookmarks
+  unfollow      Unfollow a user
+  user-tweets   Fetch tweets from a user timeline
+  version       Print version information
+  whoami        Print the currently authenticated user
+
+Flags:
+      --alt stringArray             alt text for the corresponding media file
+      --auth-token string           Twitter auth_token cookie value
+      --browser string              Browser to extract cookies from (safari, chrome, firefox)
+      --chrome-profile string       Chrome profile name
+      --chrome-profile-dir string   Chrome/Chromium profile directory or cookie DB path
+      --config string               Config file path
+      --cookie-source stringArray   browser cookie source(s): safari, chrome, firefox
+      --cookie-timeout int          Cookie extraction timeout in ms
+  -n, --count int                   Maximum number of items to fetch
+      --ct0 string                  Twitter ct0 cookie value
+      --firefox-profile string      Firefox profile name
+  -h, --help                        help for gobird
+      --json                        Output as JSON
+      --json-full                   Output as full JSON (includes raw)
+      --max-pages int               Maximum number of pages to fetch
+      --media stringArray           media file path(s) to attach
+      --no-color                    Disable ANSI color
+      --no-emoji                    Disable emoji
+      --plain                       Plain text output
+      --quote-depth int             Quoted tweet expansion depth (default -1)
+      --timeout int                 HTTP request timeout in ms
+      --version                     Print version information
+
+Use "gobird [command] --help" for more information about a command.
