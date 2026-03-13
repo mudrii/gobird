@@ -70,6 +70,9 @@ func renderContentState(contentStateJSON string) string {
 		} else {
 			rendered = renderBlockText(block, cs.EntityMap)
 		}
+		if rendered == "" {
+			continue
+		}
 		blocks = append(blocks, rendered)
 	}
 	return strings.Join(blocks, "\n\n")

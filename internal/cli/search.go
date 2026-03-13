@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 
+	"github.com/mudrii/gobird/internal/output"
 	"github.com/mudrii/gobird/internal/parsing"
 	"github.com/mudrii/gobird/internal/types"
 	"github.com/spf13/cobra"
@@ -37,13 +37,11 @@ func newSearchCmd() *cobra.Command {
 			}
 
 			if globalFlags.jsonOutput || globalFlags.jsonFull {
-				out, _ := json.MarshalIndent(result.Items, "", "  ")
-				cmd.Println(string(out))
-			} else {
-				for i := range result.Items {
-					printTweet(cmd, &result.Items[i])
-					cmd.Println("---")
-				}
+				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
+			}
+			for i := range result.Items {
+				printTweet(cmd, &result.Items[i])
+				cmd.Println("---")
 			}
 			return nil
 		},
@@ -89,13 +87,11 @@ func newMentionsCmd() *cobra.Command {
 			}
 
 			if globalFlags.jsonOutput || globalFlags.jsonFull {
-				out, _ := json.MarshalIndent(result.Items, "", "  ")
-				cmd.Println(string(out))
-			} else {
-				for i := range result.Items {
-					printTweet(cmd, &result.Items[i])
-					cmd.Println("---")
-				}
+				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
+			}
+			for i := range result.Items {
+				printTweet(cmd, &result.Items[i])
+				cmd.Println("---")
 			}
 			return nil
 		},

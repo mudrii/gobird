@@ -64,7 +64,11 @@ func (c *Client) AllQueryIDs(operation string) []string {
 // refreshQueryIDs scrapes fresh query IDs from the X.com bundle and updates
 // the in-memory cache. Errors are silently ignored to preserve availability.
 func (c *Client) refreshQueryIDs(ctx context.Context) {
-	refreshed := scrapeQueryIDs(ctx)
+	scraper := c.scraper
+	if scraper == nil {
+		scraper = scrapeQueryIDs
+	}
+	refreshed := scraper(ctx)
 	c.queryIDMu.Lock()
 	defer c.queryIDMu.Unlock()
 	for op, id := range BundledBaselineQueryIDs {

@@ -82,6 +82,7 @@ func Load(explicitPath string) (*Config, error) {
 			}
 		}
 	}
+	applyDefaults(cfg)
 	applyEnv(cfg)
 	return cfg, nil
 }
@@ -119,6 +120,13 @@ func loadFile(path string, cfg *Config) error {
 		return err
 	}
 	return json.Unmarshal(std, cfg)
+}
+
+// applyDefaults sets zero-value fields to their documented defaults.
+func applyDefaults(cfg *Config) {
+	if cfg.QuoteDepth == 0 {
+		cfg.QuoteDepth = 1
+	}
 }
 
 // applyEnv overlays environment variables onto the loaded config.

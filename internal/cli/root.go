@@ -52,6 +52,12 @@ func NewRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          cobra.MaximumNArgs(1),
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+			if err := validateOutputFlags(); err != nil {
+				return err
+			}
+			return validateLimit(globalFlags.limit)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if globalFlags.version {
 				return printVersion(cmd)

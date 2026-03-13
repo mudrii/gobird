@@ -53,41 +53,6 @@ func resolveClient() (*client.Client, error) {
 	return client.New(creds.AuthToken, creds.Ct0, clientOpts), nil
 }
 
-// resolveCredentialsFromOptions resolves credentials using current global flags and config.
-func resolveCredentialsFromOptions() (authToken, ct0 string, err error) {
-	cfg, err := config.Load(globalFlags.configPath)
-	if err != nil {
-		return "", "", fmt.Errorf("load config: %w", err)
-	}
-
-	opts := auth.ResolveOptions{
-		Browser:         globalFlags.browser,
-		CookieSources:   resolveCookieSources(cfg),
-		ChromeProfile:   resolveChromeProfile(cfg),
-		FirefoxProfile:  firstNonEmptyString(globalFlags.firefoxProfile, cfg.FirefoxProfile),
-		CookieTimeoutMs: resolveCookieTimeoutMs(cfg),
-	}
-	if globalFlags.authToken != "" {
-		opts.FlagAuthToken = globalFlags.authToken
-	} else {
-		opts.FlagAuthToken = cfg.AuthToken
-	}
-	if globalFlags.ct0 != "" {
-		opts.FlagCt0 = globalFlags.ct0
-	} else {
-		opts.FlagCt0 = cfg.Ct0
-	}
-	if opts.Browser == "" {
-		opts.Browser = cfg.DefaultBrowser
-	}
-
-	creds, err := auth.ResolveCredentials(opts)
-	if err != nil {
-		return "", "", fmt.Errorf("resolve credentials: %w", err)
-	}
-	return creds.AuthToken, creds.Ct0, nil
-}
-
 func resolveCookieSources(cfg *config.Config) []string {
 	if len(globalFlags.cookieSources) > 0 {
 		return globalFlags.cookieSources
@@ -183,4 +148,31 @@ func resolveQuoteDepthFromCommand() int {
 		return 1
 	}
 	return resolveQuoteDepth(cfg)
+}
+
+// validateOutputFlags returns an error if more than one of --json, --json-full,
+// or --plain are set at the same time.
+func validateOutputFlags() error {
+	count := 0
+	if globalFlags.jsonOutput {
+		count++
+	}
+	if globalFlags.jsonFull {
+		count++
+	}
+	if globalFlags.plain {
+		count++
+	}
+	if count > 1 {
+		return fmt.Errorf("invalid flags: --json, --json-full, and --plain are mutually exclusive")
+	}
+	return nil
+}
+
+// validateLimit returns an error when limit is negative.
+func validateLimit(limit int) error {
+	if limit < 0 {
+		return fmt.Errorf("invalid value: --count / --limit must be >= 0, got %d", limit)
+	}
+	return nil
 }

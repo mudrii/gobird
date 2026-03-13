@@ -131,6 +131,11 @@ func buildCookieHeader(authToken, ct0 string) string {
 	return "auth_token=" + authToken + "; ct0=" + ct0
 }
 
+// ExportedExtractWithTimeout is the exported wrapper of extractWithTimeout for testing.
+func ExportedExtractWithTimeout(timeoutMs int, fn func() (*types.TwitterCookies, error)) (*types.TwitterCookies, error) {
+	return extractWithTimeout(timeoutMs, fn)
+}
+
 // ExtractSafariCookies reads Twitter cookies from Safari.
 func ExtractSafariCookies() (*types.TwitterCookies, error) {
 	return extractSafari()

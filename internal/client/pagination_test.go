@@ -3,8 +3,11 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
 	"testing"
 
+	"github.com/mudrii/gobird/internal/testutil"
 	"github.com/mudrii/gobird/internal/types"
 )
 
@@ -243,5 +246,172 @@ func TestPaginateInline_DeduplicatesByID(t *testing.T) {
 	// "b" appears on both pages but should only be counted once.
 	if len(result.Items) != 3 {
 		t.Errorf("expected 3 unique items, got %d", len(result.Items))
+	}
+}
+
+// threadedConvResponse builds a threaded_conversation_with_injections_v2 JSON
+// response containing tweetIDs as tweet entries plus an optional bottom cursor.
+func threadedConvResponse(tweetIDs []string, bottomCursor string) string {
+	entries := ""
+	sortIdx := len(tweetIDs) + 1
+	for i, id := range tweetIDs {
+		if i > 0 {
+			entries += ","
+		}
+		entries += fmt.Sprintf(`{
+			"entryId":"tweet-%s",
+			"sortIndex":"%d",
+			"content":{
+				"entryType":"TimelineTimelineItem",
+				"itemContent":{
+					"__typename":"TimelineTweet",
+					"tweet_results":{
+						"result":{
+							"__typename":"Tweet",
+							"rest_id":"%s",
+							"legacy":{
+								"full_text":"tweet %s",
+								"created_at":"",
+								"conversation_id_str":"%s",
+								"reply_count":0,"retweet_count":0,"favorite_count":0,
+								"user_id_str":"1"
+							}
+						}
+					}
+				}
+			}
+		}`, id, sortIdx-i, id, id, id)
+	}
+	if bottomCursor != "" {
+		if entries != "" {
+			entries += ","
+		}
+		entries += fmt.Sprintf(`{
+			"entryId":"cursor-bottom",
+			"sortIndex":"0",
+			"content":{
+				"entryType":"TimelineTimelineCursor",
+				"cursorType":"Bottom",
+				"value":%q
+			}
+		}`, bottomCursor)
+	}
+	return fmt.Sprintf(`{
+		"data":{
+			"threaded_conversation_with_injections_v2":{
+				"instructions":[{
+					"type":"TimelineAddEntries",
+					"entries":[%s]
+				}]
+			}
+		}
+	}`, entries)
+}
+
+func TestPaginateCursor_StopsOnEmptyCursor(t *testing.T) {
+	// Server returns tweets with no bottom cursor → should stop after 1 page.
+	calls := 0
+	srv := testutil.NewTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(threadedConvResponse([]string{"t1", "t2"}, "")))
+	}))
+	defer srv.Close()
+
+	c := newTestClientWith(srv.URL, map[string]string{"TweetDetail": "_NvJCnIjOW__EP5-RF197A"})
+	result, err := c.GetReplies(context.Background(), "t1", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("expected success, got error: %v", result.Error)
+	}
+	if calls != 1 {
+		t.Errorf("want 1 call when cursor is empty, got %d", calls)
+	}
+}
+
+func TestPaginateCursor_StopsOnUnchangedCursor(t *testing.T) {
+	// Server always returns the same cursor value → pagination stops.
+	calls := 0
+	srv := testutil.NewTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(threadedConvResponse([]string{"t1"}, "same-cursor")))
+	}))
+	defer srv.Close()
+
+	c := newTestClientWith(srv.URL, map[string]string{"TweetDetail": "_NvJCnIjOW__EP5-RF197A"})
+	// Pass the same cursor the server will return → stops immediately.
+	result, err := c.GetReplies(context.Background(), "t1", &types.ThreadOptions{
+		FetchOptions: types.FetchOptions{Cursor: "same-cursor"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("expected success")
+	}
+	if calls != 1 {
+		t.Errorf("want 1 call when cursor unchanged, got %d", calls)
+	}
+}
+
+func TestPaginateCursor_ZeroItemsDoesNotStop(t *testing.T) {
+	// paginateCursor does NOT stop on zero items — only on cursor progress.
+	calls := 0
+	srv := testutil.NewTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		// Each response has no tweets but has a new cursor — stops only when cursor repeats.
+		cursor := ""
+		if calls < 3 {
+			cursor = fmt.Sprintf("cursor-%d", calls)
+		}
+		_, _ = w.Write([]byte(threadedConvResponse([]string{}, cursor)))
+	}))
+	defer srv.Close()
+
+	c := newTestClientWith(srv.URL, map[string]string{"TweetDetail": "_NvJCnIjOW__EP5-RF197A"})
+	_, err := c.GetReplies(context.Background(), "t1", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should have fetched more than 1 page since cursor kept changing with zero items.
+	if calls < 2 {
+		t.Errorf("paginateCursor should continue on 0-item pages with new cursor; got %d calls", calls)
+	}
+}
+
+func TestPaginateCursor_RespectsMaxPages(t *testing.T) {
+	calls := 0
+	srv := testutil.NewTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		id := fmt.Sprintf("t%d", calls)
+		cursor := fmt.Sprintf("cursor-%d", calls)
+		_, _ = w.Write([]byte(threadedConvResponse([]string{id}, cursor)))
+	}))
+	defer srv.Close()
+
+	c := newTestClientWith(srv.URL, map[string]string{"TweetDetail": "_NvJCnIjOW__EP5-RF197A"})
+	result, err := c.GetReplies(context.Background(), "t1", &types.ThreadOptions{
+		FetchOptions: types.FetchOptions{MaxPages: 2},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if calls != 2 {
+		t.Errorf("want exactly 2 pages (MaxPages=2), got %d calls", calls)
+	}
+	if result.NextCursor == "" {
+		t.Error("want non-empty NextCursor when stopped at MaxPages")
 	}
 }

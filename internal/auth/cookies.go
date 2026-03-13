@@ -43,7 +43,11 @@ func extractFromBrowserOrder(order []string, opts ResolveOptions) (*types.Twitte
 			if err == nil && creds != nil {
 				return creds, nil
 			}
-			lastErr = err
+			if err != nil {
+				lastErr = err
+			} else {
+				lastErr = fmt.Errorf("%s: no Twitter cookies found", e.name)
+			}
 			break
 		}
 		if !matched {

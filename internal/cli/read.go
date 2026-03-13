@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 
+	"github.com/mudrii/gobird/internal/output"
 	"github.com/mudrii/gobird/internal/parsing"
 	"github.com/mudrii/gobird/internal/types"
 	"github.com/spf13/cobra"
@@ -42,11 +42,9 @@ func runRead(cmd *cobra.Command, input string) error {
 	}
 
 	if globalFlags.jsonOutput || globalFlags.jsonFull {
-		out, _ := json.MarshalIndent(tweet, "", "  ")
-		cmd.Println(string(out))
-	} else {
-		printTweet(cmd, tweet)
+		return output.PrintJSON(cmd.OutOrStdout(), tweet)
 	}
+	printTweet(cmd, tweet)
 	return nil
 }
 
@@ -81,13 +79,11 @@ func newRepliesCmd() *cobra.Command {
 			}
 
 			if globalFlags.jsonOutput || globalFlags.jsonFull {
-				out, _ := json.MarshalIndent(result.Items, "", "  ")
-				cmd.Println(string(out))
-			} else {
-				for i := range result.Items {
-					printTweet(cmd, &result.Items[i])
-					cmd.Println("---")
-				}
+				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
+			}
+			for i := range result.Items {
+				printTweet(cmd, &result.Items[i])
+				cmd.Println("---")
 			}
 			return nil
 		},
@@ -136,13 +132,11 @@ func newThreadCmd() *cobra.Command {
 			}
 
 			if globalFlags.jsonOutput || globalFlags.jsonFull {
-				out, _ := json.MarshalIndent(tweets, "", "  ")
-				cmd.Println(string(out))
-			} else {
-				for i := range tweets {
-					printTweet(cmd, &tweets[i].TweetData)
-					cmd.Println("---")
-				}
+				return output.PrintJSON(cmd.OutOrStdout(), tweets)
+			}
+			for i := range tweets {
+				printTweet(cmd, &tweets[i].TweetData)
+				cmd.Println("---")
 			}
 			return nil
 		},

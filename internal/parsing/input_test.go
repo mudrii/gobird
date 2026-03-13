@@ -32,3 +32,111 @@ func TestNormalizeHandle(t *testing.T) {
 		t.Errorf("want user, got %q", got)
 	}
 }
+
+func TestLooksLikeTweetInput_URL_Twitter(t *testing.T) {
+	if !parsing.LooksLikeTweetInput("https://twitter.com/user/status/1234567890123456789") {
+		t.Error("twitter.com URL should be a tweet input")
+	}
+}
+
+func TestLooksLikeTweetInput_URL_X(t *testing.T) {
+	if !parsing.LooksLikeTweetInput("https://x.com/user/status/9876543210987654") {
+		t.Error("x.com URL should be a tweet input")
+	}
+}
+
+func TestLooksLikeTweetInput_NumericID(t *testing.T) {
+	if !parsing.LooksLikeTweetInput("1234567890123456789") {
+		t.Error("19-digit numeric string should be a tweet input")
+	}
+}
+
+func TestLooksLikeTweetInput_Handle(t *testing.T) {
+	if parsing.LooksLikeTweetInput("@user") {
+		t.Error("@user handle should not be a tweet input")
+	}
+}
+
+func TestLooksLikeTweetInput_ShortNumber(t *testing.T) {
+	if parsing.LooksLikeTweetInput("12345") {
+		t.Error("short numeric string (< 15 digits) should not be a tweet input")
+	}
+}
+
+func TestLooksLikeTweetInput_EmptyString(t *testing.T) {
+	if parsing.LooksLikeTweetInput("") {
+		t.Error("empty string should not be a tweet input")
+	}
+}
+
+func TestExtractTweetID_FromURL_Twitter(t *testing.T) {
+	got := parsing.ExtractTweetID("https://twitter.com/someuser/status/1234567890123456789")
+	if got != "1234567890123456789" {
+		t.Errorf("want 1234567890123456789, got %q", got)
+	}
+}
+
+func TestExtractTweetID_FromURL_X(t *testing.T) {
+	got := parsing.ExtractTweetID("https://x.com/anotheruser/status/9876543210987654321")
+	if got != "9876543210987654321" {
+		t.Errorf("want 9876543210987654321, got %q", got)
+	}
+}
+
+func TestExtractTweetID_FromID(t *testing.T) {
+	got := parsing.ExtractTweetID("1234567890123456789")
+	if got != "1234567890123456789" {
+		t.Errorf("want 1234567890123456789, got %q", got)
+	}
+}
+
+func TestExtractTweetID_Invalid(t *testing.T) {
+	cases := []string{"", "hello", "@user", "123", "https://twitter.com/user"}
+	for _, c := range cases {
+		if got := parsing.ExtractTweetID(c); got != "" {
+			t.Errorf("ExtractTweetID(%q) = %q, want empty", c, got)
+		}
+	}
+}
+
+func TestNormalizeHandle_WithAt(t *testing.T) {
+	got := parsing.NormalizeHandle("@user")
+	if got != "user" {
+		t.Errorf("want user, got %q", got)
+	}
+}
+
+func TestNormalizeHandle_WithoutAt(t *testing.T) {
+	got := parsing.NormalizeHandle("user")
+	if got != "user" {
+		t.Errorf("want user, got %q", got)
+	}
+}
+
+func TestNormalizeHandle_Lowercases(t *testing.T) {
+	got := parsing.NormalizeHandle("@UPPERCASE")
+	if got != "uppercase" {
+		t.Errorf("want uppercase, got %q", got)
+	}
+}
+
+func TestExtractListID_FromURL(t *testing.T) {
+	got := parsing.ExtractListID("https://twitter.com/i/lists/123456")
+	if got != "123456" {
+		t.Errorf("want 123456, got %q", got)
+	}
+}
+
+func TestExtractListID_FromBareID(t *testing.T) {
+	got := parsing.ExtractListID("123456")
+	if got != "123456" {
+		t.Errorf("want 123456, got %q", got)
+	}
+}
+
+func TestExtractListID_Invalid(t *testing.T) {
+	got := parsing.ExtractListID("not-a-list")
+	if got != "" {
+		t.Errorf("want empty, got %q", got)
+	}
+}

@@ -30,6 +30,9 @@ type Client struct {
 	// userIDMu guards userID; only a successful resolution is cached.
 	userIDMu sync.Mutex
 	userID   string
+
+	// scraper overrides scrapeQueryIDs for testing. If nil, the real scraper is used.
+	scraper func(ctx context.Context) map[string]string
 }
 
 // Options configures a Client at construction time.

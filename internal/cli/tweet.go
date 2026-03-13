@@ -2,9 +2,9 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
+	"github.com/mudrii/gobird/internal/output"
 	"github.com/mudrii/gobird/internal/parsing"
 	"github.com/spf13/cobra"
 )
@@ -15,6 +15,9 @@ func newTweetCmd() *cobra.Command {
 		Short: "Post a new tweet",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateOutputFlags(); err != nil {
+				return err
+			}
 			text := args[0]
 
 			c, err := resolveClient()
@@ -33,11 +36,9 @@ func newTweetCmd() *cobra.Command {
 			}
 
 			if globalFlags.jsonOutput || globalFlags.jsonFull {
-				out, _ := json.MarshalIndent(map[string]string{"id": tweetID}, "", "  ")
-				cmd.Println(string(out))
-			} else {
-				cmd.Println(tweetID)
+				return output.PrintJSON(cmd.OutOrStdout(), map[string]string{"id": tweetID})
 			}
+			cmd.Println(tweetID)
 			return nil
 		},
 	}
@@ -49,6 +50,9 @@ func newReplyCmd() *cobra.Command {
 		Short: "Reply to a tweet",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateOutputFlags(); err != nil {
+				return err
+			}
 			input := args[0]
 			text := args[1]
 
@@ -73,11 +77,9 @@ func newReplyCmd() *cobra.Command {
 			}
 
 			if globalFlags.jsonOutput || globalFlags.jsonFull {
-				out, _ := json.MarshalIndent(map[string]string{"id": newID}, "", "  ")
-				cmd.Println(string(out))
-			} else {
-				cmd.Println(newID)
+				return output.PrintJSON(cmd.OutOrStdout(), map[string]string{"id": newID})
 			}
+			cmd.Println(newID)
 			return nil
 		},
 	}

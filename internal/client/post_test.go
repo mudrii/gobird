@@ -22,6 +22,8 @@ func newTestClient(handler http.Handler) (*Client, *httptest.Server) {
 	c.httpClient = &http.Client{
 		Transport: redirectTransport(srv.URL),
 	}
+	// Prevent real HTTP scraping in tests.
+	c.scraper = func(_ context.Context) map[string]string { return nil }
 	return c, srv
 }
 
