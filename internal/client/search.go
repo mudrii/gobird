@@ -70,7 +70,7 @@ func (c *Client) searchPage(ctx context.Context, queryID, q, cursor string, coun
 		"queryId":  queryID,
 	}
 
-	raw, httpErr := c.doPOSTJSON(ctx, u.String(), c.getJsonHeaders(), body)
+	raw, httpErr := c.doPOSTJSON(ctx, u.String(), c.getJSONHeaders(), body)
 	if httpErr != nil {
 		return inlinePageResult{success: false, err: httpErr}
 	}

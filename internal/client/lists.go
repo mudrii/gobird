@@ -88,7 +88,7 @@ func (c *Client) fetchLists(ctx context.Context, operation string, userID string
 // Correction #30: ListOwnerships variables:
 // {"userId":"<currentUserId>","count":100,"isListMembershipShown":true,"isListMemberTargetUserId":"<currentUserId>"}
 // No cursor even for pagination.
-func (c *Client) fetchListsPage(ctx context.Context, operation string, userID string, cursor string, includeRaw bool) (*types.ListPage, error) {
+func (c *Client) fetchListsPage(ctx context.Context, operation string, userID string, _ string, includeRaw bool) (*types.ListPage, error) {
 	queryIDs := c.getQueryIDs(operation)
 	features := buildListsFeatures()
 
@@ -116,7 +116,7 @@ func (c *Client) fetchListsPage(ctx context.Context, operation string, userID st
 			url.QueryEscape(string(varsJSON)),
 			url.QueryEscape(string(featuresJSON)),
 		)
-		body, err := c.doGET(ctx, reqURL, c.getJsonHeaders())
+		body, err := c.doGET(ctx, reqURL, c.getJSONHeaders())
 		if err != nil {
 			lastErr = err
 			continue
@@ -209,7 +209,7 @@ func (c *Client) fetchListTimelinePage(ctx context.Context, listID string, curso
 			url.QueryEscape(string(varsJSON)),
 			url.QueryEscape(string(featuresJSON)),
 		)
-		body, err := c.doGET(ctx, reqURL, c.getJsonHeaders())
+		body, err := c.doGET(ctx, reqURL, c.getJSONHeaders())
 		if err != nil {
 			lastErr = err
 			continue

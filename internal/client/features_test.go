@@ -141,3 +141,96 @@ func TestLoadFeatureOverrides_InvalidJSON(t *testing.T) {
 		t.Errorf("loadFeatureOverrides: invalid JSON should yield nil Global, got %v", cfg.Global)
 	}
 }
+
+func TestBuildHomeTimelineFeatures(t *testing.T) {
+	f := buildHomeTimelineFeatures()
+	if f == nil {
+		t.Fatal("buildHomeTimelineFeatures returned nil")
+	}
+	// HomeTimeline is derived from buildTimelineFeatures which adds these keys.
+	timelineKeys := []string{
+		"blue_business_profile_image_shape_enabled",
+		"vibe_api_enabled",
+		"responsive_web_twitter_blue_verified_badge_is_enabled",
+		"interactive_text_enabled",
+		"tweetypie_unmention_optimization_enabled",
+		"longform_notetweets_richtext_consumption_enabled",
+	}
+	for _, k := range timelineKeys {
+		if _, ok := f[k]; !ok {
+			t.Errorf("buildHomeTimelineFeatures: missing key %q", k)
+		}
+	}
+	// Must include base article features.
+	if _, ok := f["articles_preview_enabled"]; !ok {
+		t.Error("buildHomeTimelineFeatures: missing articles_preview_enabled")
+	}
+}
+
+func TestBuildFollowingFeatures(t *testing.T) {
+	f := buildFollowingFeatures()
+	if f == nil {
+		t.Fatal("buildFollowingFeatures returned nil")
+	}
+	// Spot-check distinctive values from the hardcoded map.
+	checks := map[string]any{
+		"rweb_video_screen_enabled":                          true,
+		"profile_label_improvements_pcf_label_in_post_enabled": false,
+		"premium_content_api_read_enabled":                   true,
+		"tweet_awards_web_tipping_enabled":                   true,
+		"responsive_web_grok_image_annotation_enabled":       false,
+	}
+	for k, want := range checks {
+		got, ok := f[k]
+		if !ok {
+			t.Errorf("buildFollowingFeatures: missing key %q", k)
+			continue
+		}
+		if got != want {
+			t.Errorf("buildFollowingFeatures: %q want %v, got %v", k, want, got)
+		}
+	}
+}
+
+func TestBuildUserTweetsFeatures(t *testing.T) {
+	f := buildUserTweetsFeatures()
+	if f == nil {
+		t.Fatal("buildUserTweetsFeatures returned nil")
+	}
+	// Correction #29: withV2Timeline must NOT be present.
+	if _, ok := f["withV2Timeline"]; ok {
+		t.Error("buildUserTweetsFeatures: must not contain withV2Timeline (correction #29)")
+	}
+	// Should include standard graphql timeline nav flag.
+	if _, ok := f["responsive_web_graphql_timeline_navigation_enabled"]; !ok {
+		t.Error("buildUserTweetsFeatures: missing responsive_web_graphql_timeline_navigation_enabled")
+	}
+}
+
+func TestFeatureOverride_PathFile(t *testing.T) {
+	featureOverridesOnce = sync.Once{}
+	featureOverrides = featureOverrideConfig{}
+	defer func() {
+		featureOverridesOnce = sync.Once{}
+		featureOverrides = featureOverrideConfig{}
+	}()
+
+	// Write a temp file with an override.
+	tmp, err := os.CreateTemp("", "bird_features_*.json")
+	if err != nil {
+		t.Fatalf("create temp file: %v", err)
+	}
+	defer os.Remove(tmp.Name())
+
+	_, _ = tmp.WriteString(`{"global":{"verified_phone_label_enabled":true},"sets":{}}`)
+	tmp.Close()
+
+	t.Setenv("BIRD_FEATURES_PATH", tmp.Name())
+	defer os.Unsetenv("BIRD_FEATURES_PATH")
+
+	base := map[string]any{"verified_phone_label_enabled": false}
+	result := applyFeatureOverrides("test", base)
+	if v, ok := result["verified_phone_label_enabled"]; !ok || v != true {
+		t.Errorf("BIRD_FEATURES_PATH override: want true, got %v (ok=%v)", v, ok)
+	}
+}

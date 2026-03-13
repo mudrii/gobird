@@ -116,7 +116,7 @@ func (c *Client) mediaAppend(ctx context.Context, mediaID string, segmentIndex i
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		return fmt.Errorf("APPEND: drain body: %w", err)
 	}
@@ -180,7 +180,7 @@ func (c *Client) mediaSetAltText(ctx context.Context, mediaID, altText string) e
 		"media_id": mediaID,
 		"alt_text": map[string]string{"text": altText},
 	}
-	h := c.getJsonHeaders()
+	h := c.getJSONHeaders()
 	_, err := c.doPOSTJSON(ctx, MediaMetadataURL, h, body)
 	return err
 }

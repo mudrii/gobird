@@ -13,7 +13,7 @@ func (c *Client) Like(ctx context.Context, tweetID string) error {
 		"variables": map[string]any{"tweet_id": tweetID},
 		"queryId":   queryID,
 	}
-	headers := c.getJsonHeaders()
+	headers := c.getJSONHeaders()
 	headers.Set("referer", "https://x.com/i/status/"+tweetID)
 	respBody, err := c.doPOSTJSON(ctx, graphqlURL("FavoriteTweet", queryID), headers, body)
 	if err != nil {
@@ -29,7 +29,7 @@ func (c *Client) Unlike(ctx context.Context, tweetID string) error {
 		"variables": map[string]any{"tweet_id": tweetID},
 		"queryId":   queryID,
 	}
-	headers := c.getJsonHeaders()
+	headers := c.getJSONHeaders()
 	headers.Set("referer", "https://x.com/i/status/"+tweetID)
 	respBody, err := c.doPOSTJSON(ctx, graphqlURL("UnfavoriteTweet", queryID), headers, body)
 	if err != nil {
@@ -45,7 +45,7 @@ func (c *Client) Retweet(ctx context.Context, tweetID string) (string, error) {
 		"variables": map[string]any{"tweet_id": tweetID},
 		"queryId":   queryID,
 	}
-	headers := c.getJsonHeaders()
+	headers := c.getJSONHeaders()
 	headers.Set("referer", "https://x.com/i/status/"+tweetID)
 	respBody, err := c.doPOSTJSON(ctx, graphqlURL("CreateRetweet", queryID), headers, body)
 	if err != nil {
@@ -91,7 +91,7 @@ func (c *Client) Unretweet(ctx context.Context, tweetID string) error {
 		},
 		"queryId": queryID,
 	}
-	headers := c.getJsonHeaders()
+	headers := c.getJSONHeaders()
 	headers.Set("referer", "https://x.com/i/status/"+tweetID)
 	respBody, err := c.doPOSTJSON(ctx, graphqlURL("DeleteRetweet", queryID), headers, body)
 	if err != nil {
@@ -107,7 +107,7 @@ func (c *Client) Bookmark(ctx context.Context, tweetID string) error {
 		"variables": map[string]any{"tweet_id": tweetID},
 		"queryId":   queryID,
 	}
-	headers := c.getJsonHeaders()
+	headers := c.getJSONHeaders()
 	headers.Set("referer", "https://x.com/i/status/"+tweetID)
 	respBody, err := c.doPOSTJSON(ctx, graphqlURL("CreateBookmark", queryID), headers, body)
 	if err != nil {

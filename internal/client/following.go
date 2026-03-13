@@ -138,7 +138,7 @@ func (c *Client) fetchFollowPage(ctx context.Context, operation string, userID s
 			url.QueryEscape(string(varsJSON)),
 			url.QueryEscape(string(featuresJSON)),
 		)
-		body, err := c.doGET(ctx, reqURL, c.getJsonHeaders())
+		body, err := c.doGET(ctx, reqURL, c.getJSONHeaders())
 		if err != nil {
 			lastErr = err
 			continue
@@ -176,9 +176,9 @@ func (c *Client) fetchFollowPageREST(ctx context.Context, operation string, user
 		fallbackURL += "&cursor=" + url.QueryEscape(cursor)
 	}
 
-	body, err := c.doGET(ctx, primaryURL, c.getJsonHeaders())
+	body, err := c.doGET(ctx, primaryURL, c.getJSONHeaders())
 	if err != nil {
-		body, err = c.doGET(ctx, fallbackURL, c.getJsonHeaders())
+		body, err = c.doGET(ctx, fallbackURL, c.getJSONHeaders())
 		if err != nil {
 			return nil, err
 		}

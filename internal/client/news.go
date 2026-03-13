@@ -45,9 +45,6 @@ func (c *Client) GetNews(ctx context.Context, opts *types.NewsOptions) ([]types.
 		for _, item := range items {
 			if !seen[item.ID] {
 				seen[item.ID] = true
-				if opts.IncludeRaw {
-					// IncludeRaw is set on item if applicable; leave as-is since items come from parsing.
-				}
 				allItems = append(allItems, item)
 			}
 		}
@@ -92,7 +89,7 @@ func (c *Client) fetchGenericTimeline(ctx context.Context, timelineID string, ma
 				url.QueryEscape(string(varsJSON)),
 				url.QueryEscape(string(featuresJSON)),
 			)
-			body, err := c.doGET(ctx, reqURL, c.getJsonHeaders())
+			body, err := c.doGET(ctx, reqURL, c.getJSONHeaders())
 			if err != nil {
 				lastErr = err
 				if is404(err) {

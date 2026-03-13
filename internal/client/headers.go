@@ -45,7 +45,7 @@ func baseHeaders(authToken, ct0, clientUUID, deviceID, userID string) http.Heade
 }
 
 // jsonHeaders returns base headers plus content-type: application/json.
-// Correction #70: getHeaders() delegates to getJsonHeaders() (includes content-type).
+// Correction #70: getHeaders() delegates to getJSONHeaders() (includes content-type).
 func jsonHeaders(authToken, ct0, clientUUID, deviceID, userID string) http.Header {
 	h := baseHeaders(authToken, ct0, clientUUID, deviceID, userID)
 	h.Set("content-type", "application/json")

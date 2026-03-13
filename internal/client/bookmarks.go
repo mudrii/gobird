@@ -9,7 +9,7 @@ func (c *Client) Unbookmark(ctx context.Context, tweetID string) error {
 		"variables": map[string]any{"tweet_id": tweetID},
 		"queryId":   queryID,
 	}
-	headers := c.getJsonHeaders()
+	headers := c.getJSONHeaders()
 	headers.Set("referer", "https://x.com/i/status/"+tweetID)
 	respBody, err := c.doPOSTJSON(ctx, graphqlURL("DeleteBookmark", queryID), headers, body)
 	if err != nil {

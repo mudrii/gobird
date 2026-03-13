@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-const queryIDCacheTTL = 24 * time.Hour
-
 // getQueryID returns the active query ID for the given operation.
 // Priority: runtime cache → bundled baseline → fallback.
 func (c *Client) getQueryID(operation string) string {
@@ -110,7 +108,7 @@ func scrapeQueryIDs(ctx context.Context) map[string]string {
 			continue
 		}
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		resp.Body.Close() //nolint:errcheck
 		if err != nil {
 			continue
 		}
@@ -130,7 +128,7 @@ func scrapeQueryIDs(ctx context.Context) map[string]string {
 				continue
 			}
 			scriptBody, err := io.ReadAll(resp.Body)
-			resp.Body.Close()
+			resp.Body.Close() //nolint:errcheck
 			if err != nil {
 				continue
 			}

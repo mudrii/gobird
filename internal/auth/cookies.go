@@ -7,16 +7,6 @@ import (
 	"github.com/mudrii/gobird/internal/types"
 )
 
-// extractFromBrowser tries each supported browser in order.
-// If browser is non-empty, only that browser is tried.
-// Domain preference: x.com > twitter.com > first match. Correction: doc §auth.
-func extractFromBrowser(browser string) (*types.TwitterCookies, error) {
-	if strings.TrimSpace(browser) == "" {
-		return extractFromBrowserOrder(nil, ResolveOptions{})
-	}
-	return extractFromBrowserOrder([]string{browser}, ResolveOptions{Browser: browser})
-}
-
 // extractFromBrowserOrder tries each supported browser in order.
 func extractFromBrowserOrder(order []string, opts ResolveOptions) (*types.TwitterCookies, error) {
 	type extractor struct {

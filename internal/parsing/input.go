@@ -6,11 +6,10 @@ import (
 )
 
 var (
-	tweetURLRe    = regexp.MustCompile(`https?://(?:twitter\.com|x\.com)/\w+/status/(\d+)`)
-	tweetIDRe     = regexp.MustCompile(`^\d{15,20}$`)
-	listURLRe     = regexp.MustCompile(`(?:twitter\.com|x\.com)/i/lists/(\d+)`)
-	listIDRe      = regexp.MustCompile(`^\d{5,20}$`)
-	handleRe      = regexp.MustCompile(`^@?(\w{1,50})$`)
+	tweetURLRe = regexp.MustCompile(`https?://(?:twitter\.com|x\.com)/\w+/status/(\d+)`)
+	tweetIDRe  = regexp.MustCompile(`^\d{15,20}$`)
+	listURLRe  = regexp.MustCompile(`(?:twitter\.com|x\.com)/i/lists/(\d+)`)
+	listIDRe   = regexp.MustCompile(`^\d{5,20}$`)
 )
 
 // LooksLikeTweetInput returns true if s could be a tweet URL or numeric ID.
@@ -49,5 +48,5 @@ func NormalizeHandle(s string) string {
 // MentionsQueryFromUserOption builds a search query for mentions of a user.
 func MentionsQueryFromUserOption(handle string) string {
 	h := NormalizeHandle(handle)
-	return "@" + h
+	return "to:" + h
 }

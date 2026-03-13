@@ -75,7 +75,7 @@ func (c *Client) fetchTweetDetail(ctx context.Context, focalTweetID string, curs
 				url.QueryEscape(string(featuresJSON)),
 				url.QueryEscape(string(togglesJSON)),
 			)
-			body, err := c.doGET(ctx, getURL, c.getJsonHeaders())
+			body, err := c.doGET(ctx, getURL, c.getJSONHeaders())
 			if err == nil {
 				return body, nil, false
 			}
@@ -91,7 +91,7 @@ func (c *Client) fetchTweetDetail(ctx context.Context, focalTweetID string, curs
 				"features":  features,
 				"queryId":   queryID,
 			}
-			body, postErr := c.doPOSTJSON(ctx, postURL, c.getJsonHeaders(), postBody)
+			body, postErr := c.doPOSTJSON(ctx, postURL, c.getJSONHeaders(), postBody)
 			if postErr == nil {
 				return body, nil, false
 			}

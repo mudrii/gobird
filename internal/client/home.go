@@ -49,7 +49,7 @@ func (c *Client) homeTimelinePage(ctx context.Context, operation, queryID, curso
 	q.Set("features", string(featJSON))
 	u.RawQuery = q.Encode()
 
-	raw, httpErr := c.doGET(ctx, u.String(), c.getJsonHeaders())
+	raw, httpErr := c.doGET(ctx, u.String(), c.getJSONHeaders())
 	if httpErr != nil {
 		return inlinePageResult{success: false, err: httpErr}
 	}

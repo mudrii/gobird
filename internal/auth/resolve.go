@@ -150,3 +150,13 @@ func ExtractChromeCookies(profileHint string) (*types.TwitterCookies, error) {
 func ExtractFirefoxCookies(profileHint string) (*types.TwitterCookies, error) {
 	return extractFirefox(profileHint)
 }
+
+// ExportedNormalizeCookieSources is the exported wrapper of normalizeCookieSources for testing.
+func ExportedNormalizeCookieSources(sources []string) ([]string, error) {
+	return normalizeCookieSources(sources)
+}
+
+// ExportedExtractFromBrowserOrder is the exported wrapper of extractFromBrowserOrder for testing.
+func ExportedExtractFromBrowserOrder(order []string, opts ResolveOptions) (*types.TwitterCookies, error) {
+	return extractFromBrowserOrder(order, opts)
+}

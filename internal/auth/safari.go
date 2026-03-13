@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // register SQLite driver for database/sql
 
 	"github.com/mudrii/gobird/internal/types"
 )
@@ -16,7 +16,7 @@ import (
 func extractSafari() (*types.TwitterCookies, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, fmt.Errorf("Safari: home directory: %w", err)
+		return nil, fmt.Errorf("safari: home directory: %w", err)
 	}
 	// Safari on macOS stores cookies in a SQLite DB under Library/Cookies/Cookies.db.
 	dbPath := filepath.Join(home, "Library", "Containers", "com.apple.Safari", "Data",
@@ -25,22 +25,22 @@ func extractSafari() (*types.TwitterCookies, error) {
 		// Try alternate path for non-sandboxed Safari.
 		dbPath = filepath.Join(home, "Library", "Cookies", "Cookies.db")
 		if _, err2 := os.Stat(dbPath); err2 != nil {
-			return nil, fmt.Errorf("Safari cookie database not found")
+			return nil, fmt.Errorf("safari: cookie database not found")
 		}
 	}
 	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro&immutable=1")
 	if err != nil {
-		return nil, fmt.Errorf("Safari: open cookie database: %w", err)
+		return nil, fmt.Errorf("safari: open cookie database: %w", err)
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	rows, err := db.Query(
 		`SELECT domain, name, value FROM cookies WHERE name IN ('auth_token','ct0') AND (domain LIKE '%x.com' OR domain LIKE '%twitter.com')`,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("Safari: query cookies: %w", err)
+		return nil, fmt.Errorf("safari: query cookies: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var cookies []domainCookie
 	for rows.Next() {
@@ -56,7 +56,7 @@ func extractSafari() (*types.TwitterCookies, error) {
 
 	authToken, ct0 := preferredDomainCookies(cookies)
 	if authToken == "" || ct0 == "" {
-		return nil, fmt.Errorf("Safari: auth_token or ct0 not found")
+		return nil, fmt.Errorf("safari: auth_token or ct0 not found")
 	}
 	return &types.TwitterCookies{
 		AuthToken:    authToken,

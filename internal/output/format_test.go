@@ -36,6 +36,9 @@ func TestFormatTweet_Basic(t *testing.T) {
 	if !strings.Contains(got, "rts: 7") {
 		t.Errorf("missing retweet count: %q", got)
 	}
+	if !strings.Contains(got, "replies:") {
+		t.Errorf("missing reply count: %q", got)
+	}
 }
 
 func TestFormatTweet_NoColor(t *testing.T) {
@@ -177,5 +180,80 @@ func TestFormatNewsItem_NoEmoji(t *testing.T) {
 	got := output.FormatNewsItem(n, output.FormatOptions{NoEmoji: true})
 	if strings.Contains(got, "📰") {
 		t.Errorf("output contains emoji when NoEmoji is set: %q", got)
+	}
+}
+
+func TestFormatTweet_WithArticle(t *testing.T) {
+	tw := makeTweet("20", "Read this article", "writer", "Writer", 0, 0)
+	tw.Article = &types.TweetArticle{Title: "Deep Dive Into Go"}
+	got := output.FormatTweet(tw, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "Deep Dive Into Go") {
+		t.Errorf("article title not shown in output: %q", got)
+	}
+}
+
+func TestFormatTweet_LikeCount_Zero(t *testing.T) {
+	tw := makeTweet("21", "Unpopular opinion", "anon", "Anon", 0, 0)
+	got := output.FormatTweet(tw, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "likes: 0") {
+		t.Errorf("zero like count should still be shown: %q", got)
+	}
+}
+
+func TestFormatTweet_ReplyCount(t *testing.T) {
+	tw := makeTweet("22", "Discussion starter", "host", "Host", 5, 1)
+	tw.ReplyCount = 17
+	got := output.FormatTweet(tw, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "replies: 17") {
+		t.Errorf("reply count not shown: %q", got)
+	}
+}
+
+func TestFormatUser_BlueVerified(t *testing.T) {
+	u := types.TwitterUser{
+		Username:       "verified_user",
+		Name:           "Verified",
+		IsBlueVerified: true,
+	}
+	got := output.FormatUser(u, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "[verified]") {
+		t.Errorf("verified badge not shown: %q", got)
+	}
+}
+
+func TestFormatUser_FollowerCount(t *testing.T) {
+	u := types.TwitterUser{
+		Username:       "popular",
+		Name:           "Popular",
+		FollowersCount: 1_500_000,
+		FollowingCount: 500,
+	}
+	got := output.FormatUser(u, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "1.5M") {
+		t.Errorf("large follower count not formatted readably (want 1.5M): %q", got)
+	}
+}
+
+func TestFormatNewsItem_WithURL(t *testing.T) {
+	n := types.NewsItem{
+		ID:       "n3",
+		Headline: "Breaking news",
+		URL:      "https://example.com/story",
+	}
+	got := output.FormatNewsItem(n, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "https://example.com/story") {
+		t.Errorf("URL not shown in output: %q", got)
+	}
+}
+
+func TestFormatNewsItem_AiNews(t *testing.T) {
+	n := types.NewsItem{
+		ID:       "n4",
+		Headline: "AI writes code",
+		IsAiNews: true,
+	}
+	got := output.FormatNewsItem(n, output.FormatOptions{NoColor: true, NoEmoji: true})
+	if !strings.Contains(got, "[AI]") {
+		t.Errorf("AI badge not shown: %q", got)
 	}
 }

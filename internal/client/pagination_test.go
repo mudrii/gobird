@@ -386,6 +386,89 @@ func TestPaginateCursor_ZeroItemsDoesNotStop(t *testing.T) {
 	}
 }
 
+func TestPaginateCursor_RespectsLimit(t *testing.T) {
+	// paginateInline stops at exact limit — 5 tweets requested, 3 per page.
+	calls := 0
+	fetch := func(_ context.Context, cursor string) inlinePageResult {
+		calls++
+		offset := (calls - 1) * 3
+		return inlinePageResult{
+			tweets: []types.TweetData{
+				makeTweet(fmt.Sprintf("t%d", offset+1)),
+				makeTweet(fmt.Sprintf("t%d", offset+2)),
+				makeTweet(fmt.Sprintf("t%d", offset+3)),
+			},
+			nextCursor: fmt.Sprintf("c%d", calls),
+			success:    true,
+		}
+	}
+
+	opts := types.FetchOptions{Limit: 5}
+	result := paginateInline(context.Background(), opts, 0, fetch)
+	if !result.Success {
+		t.Fatalf("expected success")
+	}
+	if len(result.Items) != 5 {
+		t.Errorf("RespectsLimit: want 5 items, got %d", len(result.Items))
+	}
+}
+
+func TestPaginateCursor_MultiplePages(t *testing.T) {
+	// Three pages of 1 tweet each; verify all 3 are collected.
+	pages := []inlinePageResult{
+		{tweets: []types.TweetData{makeTweet("p1t1")}, nextCursor: "c2", success: true},
+		{tweets: []types.TweetData{makeTweet("p2t1")}, nextCursor: "c3", success: true},
+		{tweets: []types.TweetData{makeTweet("p3t1")}, nextCursor: "", success: true},
+	}
+	idx := 0
+	fetch := func(_ context.Context, cursor string) inlinePageResult {
+		p := pages[idx]
+		idx++
+		return p
+	}
+
+	result := paginateInline(context.Background(), types.FetchOptions{}, 0, fetch)
+	if !result.Success {
+		t.Fatalf("expected success, got: %v", result.Error)
+	}
+	if len(result.Items) != 3 {
+		t.Errorf("MultiplePages: want 3 items, got %d", len(result.Items))
+	}
+	ids := map[string]bool{}
+	for _, item := range result.Items {
+		ids[item.ID] = true
+	}
+	for _, want := range []string{"p1t1", "p2t1", "p3t1"} {
+		if !ids[want] {
+			t.Errorf("MultiplePages: missing tweet id %q", want)
+		}
+	}
+}
+
+func TestPaginateInline_StopsOnEmptyResults(t *testing.T) {
+	// Empty tweet slice on first page → stops immediately.
+	calls := 0
+	fetch := func(_ context.Context, cursor string) inlinePageResult {
+		calls++
+		return inlinePageResult{
+			tweets:     []types.TweetData{},
+			nextCursor: "hasMore",
+			success:    true,
+		}
+	}
+
+	result := paginateInline(context.Background(), types.FetchOptions{}, 0, fetch)
+	if !result.Success {
+		t.Fatalf("expected success on empty first page")
+	}
+	if calls != 1 {
+		t.Errorf("StopsOnEmptyResults: want 1 call, got %d", calls)
+	}
+	if len(result.Items) != 0 {
+		t.Errorf("StopsOnEmptyResults: want 0 items, got %d", len(result.Items))
+	}
+}
+
 func TestPaginateCursor_RespectsMaxPages(t *testing.T) {
 	calls := 0
 	srv := testutil.NewTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

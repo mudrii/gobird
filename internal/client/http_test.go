@@ -37,7 +37,7 @@ func TestDoGET_Success(t *testing.T) {
 	defer srv.Close()
 
 	c := newBareTestClient(srv.URL)
-	body, err := c.doGET(context.Background(), srv.URL+"/test", c.getJsonHeaders())
+	body, err := c.doGET(context.Background(), srv.URL+"/test", c.getJSONHeaders())
 	if err != nil {
 		t.Fatalf("doGET: unexpected error: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestDoGET_404(t *testing.T) {
 	defer srv.Close()
 
 	c := newBareTestClient(srv.URL)
-	_, err := c.doGET(context.Background(), srv.URL+"/missing", c.getJsonHeaders())
+	_, err := c.doGET(context.Background(), srv.URL+"/missing", c.getJSONHeaders())
 	if err == nil {
 		t.Fatal("doGET: expected error for 404, got nil")
 	}
@@ -82,7 +82,7 @@ func TestDoPOSTJSON_Success(t *testing.T) {
 
 	c := newBareTestClient(srv.URL)
 	payload := map[string]any{"key": "value"}
-	body, err := c.doPOSTJSON(context.Background(), srv.URL+"/post", c.getJsonHeaders(), payload)
+	body, err := c.doPOSTJSON(context.Background(), srv.URL+"/post", c.getJSONHeaders(), payload)
 	if err != nil {
 		t.Fatalf("doPOSTJSON: unexpected error: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestFetchWithRetry_SuccessFirstAttempt(t *testing.T) {
 	defer srv.Close()
 
 	c := newBareTestClient(srv.URL)
-	body, err := c.fetchWithRetry(context.Background(), srv.URL+"/data", c.getJsonHeaders())
+	body, err := c.fetchWithRetry(context.Background(), srv.URL+"/data", c.getJSONHeaders())
 	if err != nil {
 		t.Fatalf("fetchWithRetry: unexpected error: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestFetchWithRetry_SuccessOnRetry(t *testing.T) {
 
 	c := newBareTestClient(srv.URL)
 	// Use a context that we cancel after the test to avoid long delays.
-	body, err := c.fetchWithRetry(context.Background(), srv.URL+"/data", c.getJsonHeaders())
+	body, err := c.fetchWithRetry(context.Background(), srv.URL+"/data", c.getJSONHeaders())
 	if err != nil {
 		t.Fatalf("fetchWithRetry: unexpected error on retry: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestFetchWithRetry_AllFail(t *testing.T) {
 	defer srv.Close()
 
 	c := newBareTestClient(srv.URL)
-	_, err := c.fetchWithRetry(context.Background(), srv.URL+"/data", c.getJsonHeaders())
+	_, err := c.fetchWithRetry(context.Background(), srv.URL+"/data", c.getJSONHeaders())
 	if err == nil {
 		t.Fatal("fetchWithRetry: expected error when all attempts fail")
 	}
@@ -190,5 +190,47 @@ func TestParseGraphQLErrors_NoErrors(t *testing.T) {
 	errs := parseGraphQLErrors(body)
 	if len(errs) != 0 {
 		t.Errorf("parseGraphQLErrors: expected no errors, got %d", len(errs))
+	}
+}
+
+func TestDoGET_ContextCancelled(t *testing.T) {
+	srv := testutil.NewTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// This handler should not be reached because context is already cancelled.
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer srv.Close()
+
+	c := newBareTestClient(srv.URL)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately before the request
+
+	_, err := c.doGET(ctx, srv.URL+"/test", c.getJSONHeaders())
+	if err == nil {
+		t.Fatal("doGET: expected error for cancelled context, got nil")
+	}
+}
+
+func TestDoPOSTJSON_InvalidBody(t *testing.T) {
+	srv := testutil.NewTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	c := newBareTestClient(srv.URL)
+	// A channel cannot be marshaled to JSON.
+	body := map[string]any{"bad": make(chan int)}
+	_, err := c.doPOSTJSON(context.Background(), srv.URL+"/post", c.getJSONHeaders(), body)
+	if err == nil {
+		t.Fatal("doPOSTJSON: expected marshal error for un-marshalable body, got nil")
+	}
+}
+
+func TestGraphqlURL_Encoding(t *testing.T) {
+	// graphqlURL just concatenates; verify no double-encoding happens.
+	u := graphqlURL("CreateTweet", "testQID")
+	wantSuffix := "/testQID/CreateTweet"
+	if len(u) < len(wantSuffix) || u[len(u)-len(wantSuffix):] != wantSuffix {
+		t.Errorf("graphqlURL: want suffix %q, got %q", wantSuffix, u)
 	}
 }

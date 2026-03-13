@@ -25,7 +25,7 @@ func (c *Client) bookmarkPage(ctx context.Context, queryID string, varsJSON, fea
 	q.Set("features", string(featJSON))
 	u.RawQuery = q.Encode()
 
-	raw, httpErr := c.fetchWithRetry(ctx, u.String(), c.getJsonHeaders())
+	raw, httpErr := c.fetchWithRetry(ctx, u.String(), c.getJSONHeaders())
 	if httpErr != nil {
 		return inlinePageResult{success: false, err: httpErr}
 	}
@@ -158,7 +158,7 @@ func (c *Client) bookmarkFolderPage(ctx context.Context, queryID, folderID, curs
 	q.Set("features", string(featJSON))
 	u.RawQuery = q.Encode()
 
-	raw, httpErr := c.fetchWithRetry(ctx, u.String(), c.getJsonHeaders())
+	raw, httpErr := c.fetchWithRetry(ctx, u.String(), c.getJSONHeaders())
 	if httpErr != nil {
 		return inlinePageResult{success: false, err: httpErr}
 	}
@@ -294,7 +294,7 @@ func (c *Client) likesPage(ctx context.Context, queryID, userID, cursor string, 
 	u.RawQuery = q.Encode()
 
 	// Likes uses doGET (not fetchWithRetry) — correction #49.
-	raw, httpErr := c.doGET(ctx, u.String(), c.getJsonHeaders())
+	raw, httpErr := c.doGET(ctx, u.String(), c.getJSONHeaders())
 	if httpErr != nil {
 		return inlinePageResult{success: false, err: httpErr}
 	}

@@ -100,7 +100,7 @@ func (c *Client) followViaGraphQL(ctx context.Context, userID string) error {
 		"variables": map[string]any{"user_id": userID},
 		"queryId":   queryID,
 	}
-	headers := c.getJsonHeaders()
+	headers := c.getJSONHeaders()
 	respBody, err := c.doPOSTJSON(ctx, graphqlURL("CreateFriendship", queryID), headers, body)
 	if err != nil {
 		return err
@@ -115,7 +115,7 @@ func (c *Client) unfollowViaGraphQL(ctx context.Context, userID string) error {
 		"variables": map[string]any{"user_id": userID},
 		"queryId":   queryID,
 	}
-	headers := c.getJsonHeaders()
+	headers := c.getJSONHeaders()
 	respBody, err := c.doPOSTJSON(ctx, graphqlURL("DestroyFriendship", queryID), headers, body)
 	if err != nil {
 		return err

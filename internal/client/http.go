@@ -84,7 +84,7 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func (c *Client) fetchWithRetry(ctx context.Context, url string, headers http.He
 			return nil, err
 		}
 		body, readErr := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		resp.Body.Close() //nolint:errcheck
 		if readErr != nil {
 			return nil, readErr
 		}

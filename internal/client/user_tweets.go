@@ -126,7 +126,7 @@ func (c *Client) fetchUserTweetsPage(ctx context.Context, userID string, cursor 
 			url.QueryEscape(string(featuresJSON)),
 			url.QueryEscape(string(togglesJSON)),
 		)
-		body, err := c.doGET(ctx, reqURL, c.getJsonHeaders())
+		body, err := c.doGET(ctx, reqURL, c.getJSONHeaders())
 		if err != nil {
 			lastErr = err
 			continue

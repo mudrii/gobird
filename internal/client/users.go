@@ -49,7 +49,7 @@ func (c *Client) getCurrentUser(ctx context.Context) (*types.CurrentUserResult, 
 }
 
 func (c *Client) tryGetCurrentUserFromAPI(ctx context.Context, rawURL string) *types.CurrentUserResult {
-	body, err := c.doGET(ctx, rawURL, c.getJsonHeaders())
+	body, err := c.doGET(ctx, rawURL, c.getJSONHeaders())
 	if err != nil {
 		return nil
 	}
@@ -129,7 +129,7 @@ func (c *Client) tryGetCurrentUserFromHTML(ctx context.Context, rawURL string) *
 	if err != nil {
 		return nil
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

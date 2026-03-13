@@ -73,9 +73,9 @@ func New(authToken, ct0 string, opts *Options) *Client {
 	return c
 }
 
-// getJsonHeaders returns JSON request headers for the authenticated user.
-// Correction #70: getHeaders() = getJsonHeaders().
-func (c *Client) getJsonHeaders() http.Header {
+// getJSONHeaders returns JSON request headers for the authenticated user.
+// Correction #70: getHeaders() = getJSONHeaders().
+func (c *Client) getJSONHeaders() http.Header {
 	return jsonHeaders(c.authToken, c.ct0, c.clientUUID, c.deviceID, c.userID)
 }
 

@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -272,5 +273,139 @@ func TestLoad_EmptyWhenNoFileFound(t *testing.T) {
 	// QuoteDepth default should be applied even if no file was loaded.
 	if cfg.QuoteDepth != 1 {
 		t.Errorf("QuoteDepth: want default 1, got %d", cfg.QuoteDepth)
+	}
+}
+
+// TestLoad_JSON5Comments verifies that a config file containing JSON5-style
+// comments (// and /* */) is parsed without error.
+func TestLoad_JSON5Comments(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json5")
+	content := `{
+		// This is a line comment
+		"authToken": "comment-token", /* inline comment */
+		/* block
+		   comment */
+		"ct0": "comment-ct0",
+	}`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []string{"AUTH_TOKEN", "TWITTER_AUTH_TOKEN", "CT0", "TWITTER_CT0"} {
+		t.Setenv(e, "")
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load with comments: %v", err)
+	}
+	if cfg.AuthToken != "comment-token" {
+		t.Errorf("AuthToken: want %q, got %q", "comment-token", cfg.AuthToken)
+	}
+	if cfg.Ct0 != "comment-ct0" {
+		t.Errorf("Ct0: want %q, got %q", "comment-ct0", cfg.Ct0)
+	}
+}
+
+// TestLoad_CookieSourceString verifies cookie_source as a single string is
+// decoded into a one-element slice (integration test via file).
+func TestLoad_CookieSourceString(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.json5")
+	if err := os.WriteFile(path, []byte(`{"cookieSource":"firefox"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []string{"AUTH_TOKEN", "TWITTER_AUTH_TOKEN", "CT0", "TWITTER_CT0"} {
+		t.Setenv(e, "")
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.CookieSource) != 1 || cfg.CookieSource[0] != "firefox" {
+		t.Errorf("CookieSource: want [firefox], got %v", cfg.CookieSource)
+	}
+}
+
+// TestLoad_CookieSourceArray verifies cookie_source as a JSON array is decoded
+// into a slice with all elements preserved (integration test via file).
+func TestLoad_CookieSourceArray(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.json5")
+	if err := os.WriteFile(path, []byte(`{"cookieSource":["safari","chrome","firefox"]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []string{"AUTH_TOKEN", "TWITTER_AUTH_TOKEN", "CT0", "TWITTER_CT0"} {
+		t.Setenv(e, "")
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := []string{"safari", "chrome", "firefox"}
+	if len(cfg.CookieSource) != len(want) {
+		t.Fatalf("CookieSource len: want %d, got %d", len(want), len(cfg.CookieSource))
+	}
+	for i, w := range want {
+		if cfg.CookieSource[i] != w {
+			t.Errorf("CookieSource[%d]: want %q, got %q", i, w, cfg.CookieSource[i])
+		}
+	}
+}
+
+// TestStringOrSlice_UnmarshalJSON_String verifies direct unmarshalling of a
+// JSON string into StringOrSlice.
+func TestStringOrSlice_UnmarshalJSON_String(t *testing.T) {
+	var s config.StringOrSlice
+	if err := json.Unmarshal([]byte(`"safari"`), &s); err != nil {
+		t.Fatalf("Unmarshal string: %v", err)
+	}
+	if len(s) != 1 || s[0] != "safari" {
+		t.Errorf("want [safari], got %v", []string(s))
+	}
+}
+
+// TestStringOrSlice_UnmarshalJSON_EmptyString verifies that an empty string
+// value results in a nil slice.
+func TestStringOrSlice_UnmarshalJSON_EmptyString(t *testing.T) {
+	var s config.StringOrSlice
+	if err := json.Unmarshal([]byte(`""`), &s); err != nil {
+		t.Fatalf("Unmarshal empty string: %v", err)
+	}
+	if s != nil {
+		t.Errorf("want nil for empty string, got %v", []string(s))
+	}
+}
+
+// TestStringOrSlice_UnmarshalJSON_Array verifies direct unmarshalling of a
+// JSON array into StringOrSlice.
+func TestStringOrSlice_UnmarshalJSON_Array(t *testing.T) {
+	var s config.StringOrSlice
+	if err := json.Unmarshal([]byte(`["chrome","firefox"]`), &s); err != nil {
+		t.Fatalf("Unmarshal array: %v", err)
+	}
+	if len(s) != 2 || s[0] != "chrome" || s[1] != "firefox" {
+		t.Errorf("want [chrome firefox], got %v", []string(s))
+	}
+}
+
+// TestStringOrSlice_UnmarshalJSON_Invalid verifies that a non-string, non-array
+// JSON value (e.g. a number) returns an error.
+func TestStringOrSlice_UnmarshalJSON_Invalid(t *testing.T) {
+	var s config.StringOrSlice
+	err := json.Unmarshal([]byte(`42`), &s)
+	if err == nil {
+		t.Fatal("expected error for number input, got nil")
+	}
+}
+
+// TestStringOrSlice_UnmarshalJSON_NullArray verifies null JSON value handling.
+func TestStringOrSlice_UnmarshalJSON_NullArray(t *testing.T) {
+	var s config.StringOrSlice
+	if err := json.Unmarshal([]byte(`null`), &s); err != nil {
+		t.Fatalf("Unmarshal null: %v", err)
+	}
+	// null decodes as a nil slice for []string
+	if len(s) != 0 {
+		t.Errorf("want empty/nil for null, got %v", []string(s))
 	}
 }

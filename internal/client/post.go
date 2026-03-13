@@ -32,7 +32,7 @@ func (c *Client) ReplyWithMedia(ctx context.Context, text, inReplyToID string, m
 func (c *Client) createTweet(ctx context.Context, text, inReplyToID string, mediaIDs []string) (string, error) {
 	queryID := c.getQueryID("CreateTweet")
 	body := buildCreateTweetBody(text, inReplyToID, mediaIDs, queryID)
-	headers := c.getJsonHeaders()
+	headers := c.getJSONHeaders()
 	headers.Set("referer", "https://x.com/compose/post")
 
 	// Attempt 1: POST /graphql/<queryId>/CreateTweet

@@ -1,20 +1,25 @@
+version: "2"
+
 linters:
+  default: none
   enable:
     - errcheck
     - govet
     - staticcheck
     - unused
     - revive
-
-linters-settings:
-  revive:
+  settings:
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - disableStutteringCheck
+  exclusions:
     rules:
-      - name: exported
-        arguments:
-          - disableStutteringCheck
-
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
+      - path: _test\.go
+        linters:
+          - errcheck
+          - revive
+      - linters:
+          - errcheck
+        text: "Error return value of `.*\\.Close` is not checked"

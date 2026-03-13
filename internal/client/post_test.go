@@ -225,3 +225,98 @@ func TestTryStatusUpdateFallback_numericID(t *testing.T) {
 		t.Errorf("want 99887766, got %q", id)
 	}
 }
+
+func TestCreateTweet_Success(t *testing.T) {
+	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(tweetCreateResp("tweet42"))
+	}))
+	defer srv.Close()
+
+	id, err := c.Tweet(context.Background(), "hello world")
+	if err != nil {
+		t.Fatalf("CreateTweet_Success: %v", err)
+	}
+	if id != "tweet42" {
+		t.Errorf("CreateTweet_Success: want tweet42, got %q", id)
+	}
+}
+
+func TestCreateTweet_WithMedia(t *testing.T) {
+	var body map[string]any
+	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&body)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(tweetCreateResp("mediatweet"))
+	}))
+	defer srv.Close()
+
+	_, _ = c.TweetWithMedia(context.Background(), "media post", []string{"111", "222"})
+
+	vars, ok := body["variables"].(map[string]any)
+	if !ok {
+		t.Fatal("missing variables")
+	}
+	media, ok := vars["media"].(map[string]any)
+	if !ok {
+		t.Fatal("missing media in variables")
+	}
+	entities, ok := media["media_entities"].([]any)
+	if !ok {
+		t.Fatal("missing media_entities")
+	}
+	if len(entities) != 2 {
+		t.Errorf("want 2 media entities, got %d", len(entities))
+	}
+	first, ok := entities[0].(map[string]any)
+	if !ok {
+		t.Fatal("media entity is not a map")
+	}
+	if first["media_id"] != "111" {
+		t.Errorf("first media_id: want 111, got %v", first["media_id"])
+	}
+}
+
+func TestCreateTweet_FallbackOnBadRequest(t *testing.T) {
+	// 400 is NOT a 404, so the fallback chain does NOT trigger.
+	// The first call returns 400 and the function returns an error.
+	calls := 0
+	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		http.Error(w, `{"errors":[{"message":"bad request"}]}`, http.StatusBadRequest)
+	}))
+	defer srv.Close()
+
+	_, err := c.Tweet(context.Background(), "bad")
+	if err == nil {
+		t.Fatal("expected error on 400")
+	}
+	// 400 is not retried — only one call expected.
+	if calls != 1 {
+		t.Errorf("expected 1 call on 400 (no retry), got %d", calls)
+	}
+}
+
+func TestReply_SetsInReplyToId(t *testing.T) {
+	var body map[string]any
+	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&body)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(tweetCreateResp("replyID"))
+	}))
+	defer srv.Close()
+
+	_, _ = c.Reply(context.Background(), "replying", "parentTweet99")
+
+	vars, ok := body["variables"].(map[string]any)
+	if !ok {
+		t.Fatal("missing variables")
+	}
+	reply, ok := vars["reply"].(map[string]any)
+	if !ok {
+		t.Fatal("missing reply field in variables")
+	}
+	if reply["in_reply_to_tweet_id"] != "parentTweet99" {
+		t.Errorf("in_reply_to_tweet_id: want parentTweet99, got %v", reply["in_reply_to_tweet_id"])
+	}
+}

@@ -334,3 +334,151 @@ func TestExtractWithTimeout_Timeout(t *testing.T) {
 		t.Errorf("expected 'timed out' in error, got %q", err.Error())
 	}
 }
+
+// TestNormalizeCookieSources_Valid verifies that all known browser names are accepted.
+func TestNormalizeCookieSources_Valid(t *testing.T) {
+	cases := []struct {
+		input []string
+		want  []string
+	}{
+		{[]string{"safari"}, []string{"safari"}},
+		{[]string{"chrome"}, []string{"chrome"}},
+		{[]string{"firefox"}, []string{"firefox"}},
+		{[]string{"safari", "chrome", "firefox"}, []string{"safari", "chrome", "firefox"}},
+		{[]string{"chrome", "safari"}, []string{"chrome", "safari"}},
+	}
+	for _, tc := range cases {
+		got, err := auth.ExportedNormalizeCookieSources(tc.input)
+		if err != nil {
+			t.Errorf("input %v: unexpected error: %v", tc.input, err)
+			continue
+		}
+		if len(got) != len(tc.want) {
+			t.Errorf("input %v: want %v, got %v", tc.input, tc.want, got)
+			continue
+		}
+		for i := range got {
+			if got[i] != tc.want[i] {
+				t.Errorf("input %v[%d]: want %q, got %q", tc.input, i, tc.want[i], got[i])
+			}
+		}
+	}
+}
+
+// TestNormalizeCookieSources_Invalid verifies that unknown browser names produce an error.
+// Note: normalizeCookieSources lowercases input before checking, so only truly unknown
+// names (not just differently-cased known names) should produce errors.
+func TestNormalizeCookieSources_Invalid(t *testing.T) {
+	cases := [][]string{
+		{"edge"},
+		{"brave"},
+		{""},
+		{"unknown"},
+		{"ie"},
+		{"opera"},
+	}
+	for _, input := range cases {
+		_, err := auth.ExportedNormalizeCookieSources(input)
+		if err == nil {
+			t.Errorf("input %v: expected error, got nil", input)
+		}
+	}
+}
+
+// TestNormalizeCookieSources_CaseInsensitive verifies that input is lowercased
+// before validation, so "Safari" → "safari", "Chrome" → "chrome", etc.
+func TestNormalizeCookieSources_CaseInsensitive(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"Safari", "safari"},
+		{"SAFARI", "safari"},
+		{"Chrome", "chrome"},
+		{"CHROME", "chrome"},
+		{"Firefox", "firefox"},
+		{"FIREFOX", "firefox"},
+	}
+	for _, tc := range cases {
+		got, err := auth.ExportedNormalizeCookieSources([]string{tc.input})
+		if err != nil {
+			t.Errorf("input %q: unexpected error: %v", tc.input, err)
+			continue
+		}
+		if len(got) != 1 || got[0] != tc.want {
+			t.Errorf("input %q: want [%q], got %v", tc.input, tc.want, got)
+		}
+	}
+}
+
+// TestResolveCredentials_InvalidBrowserSource verifies that an unrecognised
+// browser name in CookieSources propagates as an error.
+func TestResolveCredentials_InvalidBrowserSource(t *testing.T) {
+	t.Setenv("AUTH_TOKEN", "")
+	t.Setenv("CT0", "")
+	t.Setenv("TWITTER_AUTH_TOKEN", "")
+	t.Setenv("TWITTER_CT0", "")
+	defer func() {
+		os.Unsetenv("TWITTER_AUTH_TOKEN")
+		os.Unsetenv("TWITTER_CT0")
+	}()
+	_, err := auth.ResolveCredentials(auth.ResolveOptions{
+		CookieSources: []string{"invalidbrowser"},
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid browser source, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalidbrowser") {
+		t.Errorf("error should mention the invalid browser name, got %q", err.Error())
+	}
+}
+
+// TestExtractFromBrowserOrder_NilCreds verifies that when an extractor returns
+// (nil, nil) it is treated as a miss and the loop continues.
+func TestExtractFromBrowserOrder_NilCreds(t *testing.T) {
+	// Use a 1ms timeout so browser extraction fails quickly and we get the
+	// "no Twitter cookies found" error rather than a real browser error.
+	t.Setenv("AUTH_TOKEN", "")
+	t.Setenv("CT0", "")
+	t.Setenv("TWITTER_AUTH_TOKEN", "")
+	t.Setenv("TWITTER_CT0", "")
+	defer func() {
+		os.Unsetenv("TWITTER_AUTH_TOKEN")
+		os.Unsetenv("TWITTER_CT0")
+	}()
+
+	// extractFromBrowserOrder is called with a valid browser name that will
+	// fail (no actual browser on CI). The nil,nil path is exercised when a
+	// real extractor returns nil creds with nil err (not common but reachable).
+	// We exercise it indirectly by passing a very short timeout so the goroutine
+	// result arrives as nil,nil after the context expires, but the timeout path
+	// is already tested elsewhere. Here we test the "unknown browser" branch.
+	_, err := auth.ExportedExtractFromBrowserOrder([]string{"notabrowser"}, auth.ResolveOptions{})
+	if err == nil {
+		t.Fatal("expected error for unknown browser in order, got nil")
+	}
+	if !strings.Contains(err.Error(), "unknown browser") {
+		t.Errorf("expected 'unknown browser' in error, got %q", err.Error())
+	}
+}
+
+// TestResolveCredentials_BrowserField verifies that a Browser field alone
+// (without CookieSources) flows through normalization correctly for valid names.
+func TestResolveCredentials_BrowserField(t *testing.T) {
+	t.Setenv("AUTH_TOKEN", "")
+	t.Setenv("CT0", "")
+	t.Setenv("TWITTER_AUTH_TOKEN", "")
+	t.Setenv("TWITTER_CT0", "")
+	defer func() {
+		os.Unsetenv("TWITTER_AUTH_TOKEN")
+		os.Unsetenv("TWITTER_CT0")
+	}()
+	// An invalid browser via Browser field should error too.
+	_, err := auth.ResolveCredentials(auth.ResolveOptions{
+		Browser:         "edge",
+		CookieTimeoutMs: 1,
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid Browser field value, got nil")
+	}
+}

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // register SQLite driver for database/sql
 
 	"github.com/mudrii/gobird/internal/types"
 )
@@ -16,13 +16,13 @@ import (
 func extractFirefox(profileHint string) (*types.TwitterCookies, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, fmt.Errorf("Firefox: home directory: %w", err)
+		return nil, fmt.Errorf("firefox: home directory: %w", err)
 	}
 
 	profileDir := filepath.Join(home, "Library", "Application Support", "Firefox", "Profiles")
 	entries, err := os.ReadDir(profileDir)
 	if err != nil {
-		return nil, fmt.Errorf("Firefox: profile directory not found: %w", err)
+		return nil, fmt.Errorf("firefox: profile directory not found: %w", err)
 	}
 
 	var dbPaths []string
@@ -42,7 +42,7 @@ func extractFirefox(profileHint string) (*types.TwitterCookies, error) {
 		}
 	}
 	if len(dbPaths) == 0 {
-		return nil, fmt.Errorf("Firefox: no cookies.sqlite found")
+		return nil, fmt.Errorf("firefox: no cookies.sqlite found")
 	}
 
 	var cookies []domainCookie
@@ -56,7 +56,7 @@ func extractFirefox(profileHint string) (*types.TwitterCookies, error) {
 
 	authToken, ct0 := preferredDomainCookies(cookies)
 	if authToken == "" || ct0 == "" {
-		return nil, fmt.Errorf("Firefox: auth_token or ct0 not found")
+		return nil, fmt.Errorf("firefox: auth_token or ct0 not found")
 	}
 	return &types.TwitterCookies{
 		AuthToken:    authToken,
@@ -68,17 +68,17 @@ func extractFirefox(profileHint string) (*types.TwitterCookies, error) {
 func readFirefoxCookies(dbPath string) ([]domainCookie, error) {
 	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro&immutable=1")
 	if err != nil {
-		return nil, fmt.Errorf("Firefox: open cookie database: %w", err)
+		return nil, fmt.Errorf("firefox: open cookie database: %w", err)
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	rows, err := db.Query(
 		`SELECT host, name, value FROM moz_cookies WHERE name IN ('auth_token','ct0') AND (host LIKE '%x.com' OR host LIKE '%twitter.com')`,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("Firefox: query cookies: %w", err)
+		return nil, fmt.Errorf("firefox: query cookies: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var result []domainCookie
 	for rows.Next() {

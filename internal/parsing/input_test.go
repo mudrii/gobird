@@ -140,3 +140,40 @@ func TestExtractListID_Invalid(t *testing.T) {
 		t.Errorf("want empty, got %q", got)
 	}
 }
+
+func TestExtractTweetID_XComURL(t *testing.T) {
+	got := parsing.ExtractTweetID("https://x.com/alice/status/1234567890123456789")
+	if got != "1234567890123456789" {
+		t.Errorf("want 1234567890123456789, got %q", got)
+	}
+}
+
+func TestExtractTweetID_TwitterComURL(t *testing.T) {
+	got := parsing.ExtractTweetID("https://twitter.com/bob/status/9876543210987654321")
+	if got != "9876543210987654321" {
+		t.Errorf("want 9876543210987654321, got %q", got)
+	}
+}
+
+func TestExtractTweetID_WithQueryParams(t *testing.T) {
+	// Query string after the ID is not part of the ID; the regex stops at the
+	// digit run so ?s=20 is ignored and the ID is still extracted correctly.
+	got := parsing.ExtractTweetID("https://twitter.com/user/status/1234567890123456789?s=20")
+	if got != "1234567890123456789" {
+		t.Errorf("want 1234567890123456789, got %q", got)
+	}
+}
+
+func TestMentionsQueryFromUserOption_WithAt(t *testing.T) {
+	got := parsing.MentionsQueryFromUserOption("@alice")
+	if got != "to:alice" {
+		t.Errorf("want to:alice, got %q", got)
+	}
+}
+
+func TestMentionsQueryFromUserOption_WithoutAt(t *testing.T) {
+	got := parsing.MentionsQueryFromUserOption("alice")
+	if got != "to:alice" {
+		t.Errorf("want to:alice, got %q", got)
+	}
+}

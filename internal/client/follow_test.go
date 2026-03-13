@@ -117,3 +117,70 @@ func TestUnfollow_success(t *testing.T) {
 		t.Errorf("expected friendships/destroy endpoint, got %q", gotURL)
 	}
 }
+
+func TestFollow_RESTFirst(t *testing.T) {
+	// Verify the very first request hits the REST friendships/create endpoint.
+	var firstURL string
+	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if firstURL == "" {
+			firstURL = r.URL.Path
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"id_str":"u99"}`))
+	}))
+	defer srv.Close()
+
+	_ = c.Follow(context.Background(), "u99")
+
+	if !strings.Contains(firstURL, "friendships/create") {
+		t.Errorf("Follow_RESTFirst: first request should be friendships/create, got %q", firstURL)
+	}
+}
+
+func TestFollow_ErrorCode160_Success(t *testing.T) {
+	// Error code 160 in a 2xx body means already-following → treat as success.
+	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// 200 OK body with errors array containing code 160.
+		w.Write([]byte(`{"errors":[{"code":160,"message":"already following"}]}`))
+	}))
+	defer srv.Close()
+
+	err := c.followViaREST(context.Background(), srv.URL+"/1.1/friendships/create.json", "u160")
+	if err != nil {
+		t.Errorf("code 160 in body should be success, got: %v", err)
+	}
+}
+
+func TestFollow_ErrorCode162_Blocked(t *testing.T) {
+	// Error code 162 = blocked → should surface as a followError.
+	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"errors":[{"code":162,"message":"blocked"}]}`))
+	}))
+	defer srv.Close()
+
+	err := c.followViaREST(context.Background(), srv.URL+"/1.1/friendships/create.json", "u162")
+	if !isFollowBlocked(err) {
+		t.Errorf("code 162 should be follow-blocked error, got: %v", err)
+	}
+}
+
+func TestUnfollow_SendsUserId(t *testing.T) {
+	var gotBody string
+	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"id_str":"u5"}`))
+	}))
+	defer srv.Close()
+
+	_ = c.Unfollow(context.Background(), "u5")
+
+	vals, _ := url.ParseQuery(gotBody)
+	if vals.Get("user_id") != "u5" {
+		t.Errorf("Unfollow user_id: want u5, got %q", vals.Get("user_id"))
+	}
+}

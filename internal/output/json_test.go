@@ -3,6 +3,7 @@ package output_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -88,5 +89,32 @@ func TestPrintJSON_NilValue(t *testing.T) {
 	got := strings.TrimSpace(buf.String())
 	if got != "null" {
 		t.Errorf("expected 'null', got %q", got)
+	}
+}
+
+// errorWriter is an io.Writer that always returns an error.
+type errorWriter struct{}
+
+func (errorWriter) Write(_ []byte) (int, error) {
+	return 0, fmt.Errorf("simulated write error")
+}
+
+func TestPrintJSON_PropagatesWriteError(t *testing.T) {
+	err := output.PrintJSON(errorWriter{}, map[string]string{"k": "v"})
+	if err == nil {
+		t.Fatal("expected error when writer fails, got nil")
+	}
+	if !strings.Contains(err.Error(), "simulated write error") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestToJSON_NilInput(t *testing.T) {
+	b, err := output.ToJSON(nil)
+	if err != nil {
+		t.Fatalf("ToJSON(nil): %v", err)
+	}
+	if string(b) != "null" {
+		t.Errorf("expected 'null', got %q", string(b))
 	}
 }

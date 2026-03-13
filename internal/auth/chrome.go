@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // register SQLite driver for database/sql
 
 	"github.com/mudrii/gobird/internal/types"
 )
@@ -23,7 +23,7 @@ import (
 func extractChrome(profileHint string) (*types.TwitterCookies, error) {
 	key, err := chromeCookieKey()
 	if err != nil {
-		return nil, fmt.Errorf("Chrome: keychain key: %w", err)
+		return nil, fmt.Errorf("chrome: keychain key: %w", err)
 	}
 
 	home, err := os.UserHomeDir()
@@ -39,22 +39,22 @@ func extractChrome(profileHint string) (*types.TwitterCookies, error) {
 		}
 	}
 	if dbPath == "" {
-		return nil, fmt.Errorf("Chrome: cookie database not found")
+		return nil, fmt.Errorf("chrome: cookie database not found")
 	}
 
 	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro&immutable=1")
 	if err != nil {
-		return nil, fmt.Errorf("Chrome: open cookie database: %w", err)
+		return nil, fmt.Errorf("chrome: open cookie database: %w", err)
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	rows, err := db.Query(
 		`SELECT host_key, name, encrypted_value FROM cookies WHERE name IN ('auth_token','ct0') AND (host_key LIKE '%x.com' OR host_key LIKE '%twitter.com')`,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("Chrome: query cookies: %w", err)
+		return nil, fmt.Errorf("chrome: query cookies: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var cookies []domainCookie
 	for rows.Next() {
@@ -75,7 +75,7 @@ func extractChrome(profileHint string) (*types.TwitterCookies, error) {
 
 	authToken, ct0 := preferredDomainCookies(cookies)
 	if authToken == "" || ct0 == "" {
-		return nil, fmt.Errorf("Chrome: auth_token or ct0 not found")
+		return nil, fmt.Errorf("chrome: auth_token or ct0 not found")
 	}
 	return &types.TwitterCookies{
 		AuthToken:    authToken,

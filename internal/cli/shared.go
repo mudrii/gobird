@@ -124,7 +124,7 @@ func detectMime(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	buf := make([]byte, 512)
 	n, err := io.ReadFull(f, buf)
