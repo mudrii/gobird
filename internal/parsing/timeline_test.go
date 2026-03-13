@@ -179,6 +179,44 @@ func TestParseTweetsFromInstructions_DeduplicationAcrossInstructions(t *testing.
 	}
 }
 
+func TestParseTweetsFromInstructions_TimelinePinEntry(t *testing.T) {
+	// A pinned entry has entryId starting with "tweet-" but is the same tweet as
+	// another entry — it must be deduplicated so only one copy appears.
+	pinnedEntry := makeTweetEntry("pinned1")
+	pinnedEntry.EntryID = "tweet-pinned1"
+	regularEntry := makeTweetEntry("pinned1")
+	regularEntry.EntryID = "tweet-pinned1-again"
+
+	instructions := []types.WireTimelineInstruction{
+		{Entries: []types.WireEntry{*pinnedEntry, *regularEntry}},
+	}
+	tweets := parsing.ParseTweetsFromInstructions(instructions)
+	if len(tweets) != 1 {
+		t.Errorf("pinned tweet should be deduplicated: want 1, got %d", len(tweets))
+	}
+}
+
+func TestParseTweetsFromInstructions_TerminateEntrySkipped(t *testing.T) {
+	// A TimelineTerminateTimeline instruction has no entries with tweet content;
+	// an entry with an empty RestID is skipped.
+	terminateEntry := &types.WireEntry{
+		EntryID: "terminate-timeline",
+		Content: types.WireContent{
+			EntryType: "TimelineTerminateTimeline",
+		},
+	}
+	instructions := []types.WireTimelineInstruction{
+		{
+			Type:    "TimelineTerminateTimeline",
+			Entries: []types.WireEntry{*terminateEntry},
+		},
+	}
+	tweets := parsing.ParseTweetsFromInstructions(instructions)
+	if len(tweets) != 0 {
+		t.Errorf("TimelineTerminateTimeline should produce 0 tweets, got %d", len(tweets))
+	}
+}
+
 func TestParseTweetsFromInstructions_UnwrapsVisibilityResults(t *testing.T) {
 	inner := &types.WireRawTweet{
 		RestID: "888",

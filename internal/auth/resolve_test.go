@@ -11,41 +11,49 @@ import (
 	"github.com/mudrii/gobird/internal/types"
 )
 
+// validToken is a syntactically valid auth_token (40 hex chars).
+const validToken = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+
+// validCt0 is a syntactically valid ct0 (32+ alphanumeric chars).
+const validCt0 = "abcdef1234567890abcdef1234567890ab"
+
 func TestResolveFlagsWin(t *testing.T) {
-	t.Setenv("AUTH_TOKEN", "env-token")
-	t.Setenv("CT0", "env-ct0")
+	t.Setenv("AUTH_TOKEN", validToken)
+	t.Setenv("CT0", validCt0)
+	flagToken := "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3"
 	creds, err := auth.ResolveCredentials(auth.ResolveOptions{
-		FlagAuthToken: "flag-token",
-		FlagCt0:       "flag-ct0",
+		FlagAuthToken: flagToken,
+		FlagCt0:       validCt0,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if creds.AuthToken != "flag-token" {
-		t.Errorf("want flag-token, got %q", creds.AuthToken)
+	if creds.AuthToken != flagToken {
+		t.Errorf("want %q, got %q", flagToken, creds.AuthToken)
 	}
-	if creds.Ct0 != "flag-ct0" {
-		t.Errorf("want flag-ct0, got %q", creds.Ct0)
+	if creds.Ct0 != validCt0 {
+		t.Errorf("want %q, got %q", validCt0, creds.Ct0)
 	}
 }
 
 func TestResolveEnvVarsWin(t *testing.T) {
-	t.Setenv("AUTH_TOKEN", "env-token")
-	t.Setenv("CT0", "env-ct0")
+	t.Setenv("AUTH_TOKEN", validToken)
+	t.Setenv("CT0", validCt0)
 	creds, err := auth.ResolveCredentials(auth.ResolveOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if creds.AuthToken != "env-token" {
-		t.Errorf("want env-token, got %q", creds.AuthToken)
+	if creds.AuthToken != validToken {
+		t.Errorf("want %q, got %q", validToken, creds.AuthToken)
 	}
 }
 
 func TestResolveTwitterEnvFallback(t *testing.T) {
+	twToken := "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
 	t.Setenv("AUTH_TOKEN", "")
 	t.Setenv("CT0", "")
-	t.Setenv("TWITTER_AUTH_TOKEN", "tw-token")
-	t.Setenv("TWITTER_CT0", "tw-ct0")
+	t.Setenv("TWITTER_AUTH_TOKEN", twToken)
+	t.Setenv("TWITTER_CT0", validCt0)
 	defer func() {
 		os.Unsetenv("TWITTER_AUTH_TOKEN")
 		os.Unsetenv("TWITTER_CT0")
@@ -54,33 +62,33 @@ func TestResolveTwitterEnvFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if creds.AuthToken != "tw-token" {
-		t.Errorf("want tw-token, got %q", creds.AuthToken)
+	if creds.AuthToken != twToken {
+		t.Errorf("want %q, got %q", twToken, creds.AuthToken)
 	}
 }
 
 func TestResolveFlagsNeedBoth(t *testing.T) {
-	t.Setenv("AUTH_TOKEN", "env-token")
-	t.Setenv("CT0", "env-ct0")
+	t.Setenv("AUTH_TOKEN", validToken)
+	t.Setenv("CT0", validCt0)
 	// Only one flag set — should fall through to env.
-	creds, err := auth.ResolveCredentials(auth.ResolveOptions{FlagAuthToken: "flag-only"})
+	creds, err := auth.ResolveCredentials(auth.ResolveOptions{FlagAuthToken: "partial"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// Should use env vars since flag was incomplete.
-	if creds.AuthToken != "env-token" {
-		t.Errorf("want env-token, got %q", creds.AuthToken)
+	if creds.AuthToken != validToken {
+		t.Errorf("want env token, got %q", creds.AuthToken)
 	}
 }
 
 func TestCookieHeader(t *testing.T) {
-	t.Setenv("AUTH_TOKEN", "tok")
-	t.Setenv("CT0", "c0")
+	t.Setenv("AUTH_TOKEN", validToken)
+	t.Setenv("CT0", validCt0)
 	creds, err := auth.ResolveCredentials(auth.ResolveOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := "auth_token=tok; ct0=c0"
+	want := "auth_token=" + validToken + "; ct0=" + validCt0
 	if creds.CookieHeader != want {
 		t.Errorf("CookieHeader: want %q, got %q", want, creds.CookieHeader)
 	}
@@ -91,20 +99,21 @@ func TestCookieHeader(t *testing.T) {
 func TestResolveCredentials_FlagAuthTokenAndCt0(t *testing.T) {
 	t.Setenv("AUTH_TOKEN", "")
 	t.Setenv("CT0", "")
+	flagToken := "d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5"
 	creds, err := auth.ResolveCredentials(auth.ResolveOptions{
-		FlagAuthToken: "myflagtoken",
-		FlagCt0:       "myflagct0",
+		FlagAuthToken: flagToken,
+		FlagCt0:       validCt0,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if creds.AuthToken != "myflagtoken" {
-		t.Errorf("AuthToken: want %q, got %q", "myflagtoken", creds.AuthToken)
+	if creds.AuthToken != flagToken {
+		t.Errorf("AuthToken: want %q, got %q", flagToken, creds.AuthToken)
 	}
-	if creds.Ct0 != "myflagct0" {
-		t.Errorf("Ct0: want %q, got %q", "myflagct0", creds.Ct0)
+	if creds.Ct0 != validCt0 {
+		t.Errorf("Ct0: want %q, got %q", validCt0, creds.Ct0)
 	}
-	if creds.CookieHeader != "auth_token=myflagtoken; ct0=myflagct0" {
+	if creds.CookieHeader != "auth_token="+flagToken+"; ct0="+validCt0 {
 		t.Errorf("CookieHeader: got %q", creds.CookieHeader)
 	}
 }
@@ -112,8 +121,8 @@ func TestResolveCredentials_FlagAuthTokenAndCt0(t *testing.T) {
 // TestResolveCredentials_FlagOnlyOneSet verifies that when only one flag is set
 // the resolver falls through to env vars.
 func TestResolveCredentials_FlagOnlyOneSet(t *testing.T) {
-	t.Setenv("AUTH_TOKEN", "envtok")
-	t.Setenv("CT0", "envct0")
+	t.Setenv("AUTH_TOKEN", validToken)
+	t.Setenv("CT0", validCt0)
 	creds, err := auth.ResolveCredentials(auth.ResolveOptions{
 		FlagAuthToken: "partial",
 		// FlagCt0 deliberately omitted
@@ -121,36 +130,38 @@ func TestResolveCredentials_FlagOnlyOneSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if creds.AuthToken != "envtok" {
+	if creds.AuthToken != validToken {
 		t.Errorf("expected env fallback, got %q", creds.AuthToken)
 	}
 }
 
 // TestResolveCredentials_EnvVars verifies AUTH_TOKEN and CT0 env vars are used.
 func TestResolveCredentials_EnvVars(t *testing.T) {
-	t.Setenv("AUTH_TOKEN", "myauthtoken")
-	t.Setenv("CT0", "myct0val")
+	envToken := "e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6"
+	t.Setenv("AUTH_TOKEN", envToken)
+	t.Setenv("CT0", validCt0)
 	t.Setenv("TWITTER_AUTH_TOKEN", "")
 	t.Setenv("TWITTER_CT0", "")
 	creds, err := auth.ResolveCredentials(auth.ResolveOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if creds.AuthToken != "myauthtoken" {
-		t.Errorf("AuthToken: want %q, got %q", "myauthtoken", creds.AuthToken)
+	if creds.AuthToken != envToken {
+		t.Errorf("AuthToken: want %q, got %q", envToken, creds.AuthToken)
 	}
-	if creds.Ct0 != "myct0val" {
-		t.Errorf("Ct0: want %q, got %q", "myct0val", creds.Ct0)
+	if creds.Ct0 != validCt0 {
+		t.Errorf("Ct0: want %q, got %q", validCt0, creds.Ct0)
 	}
 }
 
 // TestResolveCredentials_TwitterEnvVars verifies TWITTER_AUTH_TOKEN and
 // TWITTER_CT0 are used when the primary env vars are absent.
 func TestResolveCredentials_TwitterEnvVars(t *testing.T) {
+	twToken := "f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1"
 	t.Setenv("AUTH_TOKEN", "")
 	t.Setenv("CT0", "")
-	t.Setenv("TWITTER_AUTH_TOKEN", "twtoken")
-	t.Setenv("TWITTER_CT0", "twct0")
+	t.Setenv("TWITTER_AUTH_TOKEN", twToken)
+	t.Setenv("TWITTER_CT0", validCt0)
 	defer func() {
 		os.Unsetenv("TWITTER_AUTH_TOKEN")
 		os.Unsetenv("TWITTER_CT0")
@@ -159,11 +170,11 @@ func TestResolveCredentials_TwitterEnvVars(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if creds.AuthToken != "twtoken" {
-		t.Errorf("AuthToken: want %q, got %q", "twtoken", creds.AuthToken)
+	if creds.AuthToken != twToken {
+		t.Errorf("AuthToken: want %q, got %q", twToken, creds.AuthToken)
 	}
-	if creds.Ct0 != "twct0" {
-		t.Errorf("Ct0: want %q, got %q", "twct0", creds.Ct0)
+	if creds.Ct0 != validCt0 {
+		t.Errorf("Ct0: want %q, got %q", validCt0, creds.Ct0)
 	}
 }
 
@@ -190,16 +201,20 @@ func TestResolveCredentials_NoCredentials(t *testing.T) {
 // TestBuildCookieHeader verifies the exact "auth_token=X; ct0=Y" format
 // by exercising it through ResolveCredentials.
 func TestBuildCookieHeader(t *testing.T) {
+	tok1 := "1111111111111111111111111111111111111111"
+	ct01 := "abcdef1234567890abcdef1234567890ab"
+	tok2 := "2222222222222222222222222222222222222222"
+	ct02 := "12345678901234567890123456789012ef"
 	cases := []struct {
 		token string
 		ct0   string
 		want  string
 	}{
-		{"abc", "xyz", "auth_token=abc; ct0=xyz"},
-		{"tok123", "ct0val", "auth_token=tok123; ct0=ct0val"},
+		{tok1, ct01, "auth_token=" + tok1 + "; ct0=" + ct01},
+		{tok2, ct02, "auth_token=" + tok2 + "; ct0=" + ct02},
 	}
 	for _, tc := range cases {
-		t.Run(tc.token, func(t *testing.T) {
+		t.Run(tc.token[:8], func(t *testing.T) {
 			creds, err := auth.ResolveCredentials(auth.ResolveOptions{
 				FlagAuthToken: tc.token,
 				FlagCt0:       tc.ct0,
@@ -217,6 +232,10 @@ func TestBuildCookieHeader(t *testing.T) {
 // TestFirstNonEmpty exercises the firstNonEmpty helper indirectly through
 // credential resolution with partial env vars.
 func TestFirstNonEmpty(t *testing.T) {
+	primaryToken := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	twitterToken := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	primaryCt0 := "abcdef1234567890abcdef1234567890pp"
+	twitterCt0 := "abcdef1234567890abcdef1234567890tt"
 	cases := []struct {
 		name      string
 		authToken string
@@ -228,19 +247,19 @@ func TestFirstNonEmpty(t *testing.T) {
 		wantErr   bool
 	}{
 		{
-			name: "primary wins over twitter env",
-			authToken: "primary", twitterAT: "twitter",
-			ct0: "pct0", twitterCt: "tct0",
-			wantToken: "primary", wantCt0: "pct0",
+			name:      "primary wins over twitter env",
+			authToken: primaryToken, twitterAT: twitterToken,
+			ct0: primaryCt0, twitterCt: twitterCt0,
+			wantToken: primaryToken, wantCt0: primaryCt0,
 		},
 		{
-			name: "falls back to twitter env when primary empty",
-			authToken: "", twitterAT: "twitter",
-			ct0: "", twitterCt: "tct0",
-			wantToken: "twitter", wantCt0: "tct0",
+			name:      "falls back to twitter env when primary empty",
+			authToken: "", twitterAT: twitterToken,
+			ct0: "", twitterCt: twitterCt0,
+			wantToken: twitterToken, wantCt0: twitterCt0,
 		},
 		{
-			name: "both empty leads to browser attempt and error",
+			name:      "both empty leads to browser attempt and error",
 			authToken: "", twitterAT: "",
 			ct0: "", twitterCt: "",
 			wantErr: true,

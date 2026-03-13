@@ -127,6 +127,10 @@ func renderBlockText(block draftBlock, entityMap map[string]draftEntity) string 
 	// but for plain-text output we just return the raw text as-is.
 	// If any range covers the full text and is a LINK, return the URL instead.
 	for _, er := range block.EntityRanges {
+		// Guard against malformed ranges that extend beyond the text.
+		if er.Offset < 0 || er.Length <= 0 || er.Offset+er.Length > len(runes) {
+			continue
+		}
 		keyStr := entityKeyToString(er.Key)
 		entity, ok := entityMap[keyStr]
 		if !ok {

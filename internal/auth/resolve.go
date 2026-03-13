@@ -5,11 +5,30 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/mudrii/gobird/internal/types"
 )
+
+// authTokenRe matches a valid auth_token: 40 hex characters.
+var authTokenRe = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
+// ct0Re matches a valid ct0: 32 to 160 alphanumeric characters.
+var ct0Re = regexp.MustCompile(`^[0-9a-zA-Z]{32,160}$`)
+
+// validateCredentials returns an error when authToken or ct0 do not match
+// the expected format, preventing malformed values from reaching API requests.
+func validateCredentials(authToken, ct0 string) error {
+	if !authTokenRe.MatchString(authToken) {
+		return fmt.Errorf("auth_token has invalid format (expected 40 hex characters)")
+	}
+	if !ct0Re.MatchString(ct0) {
+		return fmt.Errorf("ct0 has invalid format (expected 32–160 alphanumeric characters)")
+	}
+	return nil
+}
 
 // ResolveOptions carries the candidate credentials from each source tier.
 type ResolveOptions struct {
@@ -39,6 +58,9 @@ type ResolveOptions struct {
 func ResolveCredentials(opts ResolveOptions) (*types.TwitterCookies, error) {
 	// 1. CLI flags — both must be set for this tier to win.
 	if opts.FlagAuthToken != "" && opts.FlagCt0 != "" {
+		if err := validateCredentials(opts.FlagAuthToken, opts.FlagCt0); err != nil {
+			return nil, fmt.Errorf("invalid credentials from flags: %w", err)
+		}
 		return &types.TwitterCookies{
 			AuthToken:    opts.FlagAuthToken,
 			Ct0:          opts.FlagCt0,
@@ -50,6 +72,9 @@ func ResolveCredentials(opts ResolveOptions) (*types.TwitterCookies, error) {
 	envToken := firstNonEmpty(os.Getenv("AUTH_TOKEN"), os.Getenv("TWITTER_AUTH_TOKEN"))
 	envCt0 := firstNonEmpty(os.Getenv("CT0"), os.Getenv("TWITTER_CT0"))
 	if envToken != "" && envCt0 != "" {
+		if err := validateCredentials(envToken, envCt0); err != nil {
+			return nil, fmt.Errorf("invalid credentials from environment: %w", err)
+		}
 		return &types.TwitterCookies{
 			AuthToken:    envToken,
 			Ct0:          envCt0,

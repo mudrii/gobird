@@ -167,3 +167,30 @@ func TestFilterAuthorOnly_NoneMatch(t *testing.T) {
 		t.Errorf("want 0 results when no tweets by author, got %d", len(result))
 	}
 }
+
+func TestFilterFullChain_ReturnsAll(t *testing.T) {
+	tweets := []types.TweetData{
+		makeTweet("A", "alice", ""),
+		makeTweet("B", "bob", "A"),
+		makeTweet("C", "alice", "B"),
+	}
+	result := parsing.FilterFullChain(tweets)
+	if len(result) != len(tweets) {
+		t.Errorf("FilterFullChain: want %d tweets (all), got %d", len(tweets), len(result))
+	}
+}
+
+func TestFilterFullChain_Empty(t *testing.T) {
+	result := parsing.FilterFullChain(nil)
+	if len(result) != 0 {
+		t.Errorf("FilterFullChain(nil): want 0 items, got %d", len(result))
+	}
+}
+
+func TestFilterFullChain_Single(t *testing.T) {
+	tweets := []types.TweetData{makeTweet("X", "user", "")}
+	result := parsing.FilterFullChain(tweets)
+	if len(result) != 1 {
+		t.Errorf("FilterFullChain: want 1 item for single tweet, got %d", len(result))
+	}
+}

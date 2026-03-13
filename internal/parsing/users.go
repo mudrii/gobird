@@ -35,21 +35,42 @@ func MapUser(raw *types.WireRawUser) *types.TwitterUser {
 	return u
 }
 
+// collectUserFromItemContent extracts a user from a WireItemContent if present.
+func collectUserFromItemContent(ic *types.WireItemContent, seen map[string]bool, users *[]types.TwitterUser) {
+	if ic == nil {
+		return
+	}
+	ur := ic.UserResult
+	if ur == nil || ur.Result == nil {
+		return
+	}
+	u := MapUser(ur.Result)
+	if u != nil && !seen[u.ID] {
+		seen[u.ID] = true
+		*users = append(*users, *u)
+	}
+}
+
 // ParseUsersFromInstructions collects normalized TwitterUser items from
 // timeline instructions. Handles UserWithVisibilityResults unwrapping.
+// Checks both inst.Entries (multi-entry) and inst.Entry (single-entry) forms,
+// and also scans module items within each entry.
 func ParseUsersFromInstructions(instructions []types.WireTimelineInstruction) []types.TwitterUser {
 	var users []types.TwitterUser
 	seen := map[string]bool{}
 	for _, inst := range instructions {
 		for _, entry := range inst.Entries {
-			if entry.Content.ItemContent != nil {
-				if ur := entry.Content.ItemContent.UserResult; ur != nil && ur.Result != nil {
-					u := MapUser(ur.Result)
-					if u != nil && !seen[u.ID] {
-						seen[u.ID] = true
-						users = append(users, *u)
-					}
-				}
+			collectUserFromItemContent(entry.Content.ItemContent, seen, &users)
+			// Also scan module items within each entry.
+			for _, item := range entry.Content.Items {
+				collectUserFromItemContent(item.Item.ItemContent, seen, &users)
+			}
+		}
+		// Some instructions use the singular Entry field instead of Entries.
+		if inst.Entry != nil {
+			collectUserFromItemContent(inst.Entry.Content.ItemContent, seen, &users)
+			for _, item := range inst.Entry.Content.Items {
+				collectUserFromItemContent(item.Item.ItemContent, seen, &users)
 			}
 		}
 	}

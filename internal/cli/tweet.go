@@ -101,6 +101,9 @@ func uploadGlobalMedia(cmd *cobra.Command, c mediaUploader) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("detect media type %q: %w", path, err)
 		}
+		if err := validateMediaMIME(mimeType); err != nil {
+			return nil, fmt.Errorf("media %q: %w", path, err)
+		}
 		altText := ""
 		if i < len(globalFlags.altTexts) {
 			altText = globalFlags.altTexts[i]

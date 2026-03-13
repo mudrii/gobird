@@ -28,7 +28,7 @@ type Client struct {
 
 	// userID is the authenticated user's numeric ID, resolved lazily.
 	// userIDMu guards userID; only a successful resolution is cached.
-	userIDMu sync.Mutex
+	userIDMu sync.RWMutex
 	userID   string
 
 	// scraper overrides scrapeQueryIDs for testing. If nil, the real scraper is used.
@@ -73,36 +73,54 @@ func New(authToken, ct0 string, opts *Options) *Client {
 	return c
 }
 
+// cachedUserID returns the cached user ID under the read lock.
+func (c *Client) cachedUserID() string {
+	c.userIDMu.RLock()
+	id := c.userID
+	c.userIDMu.RUnlock()
+	return id
+}
+
 // getJSONHeaders returns JSON request headers for the authenticated user.
 // Correction #70: getHeaders() = getJSONHeaders().
 func (c *Client) getJSONHeaders() http.Header {
-	return jsonHeaders(c.authToken, c.ct0, c.clientUUID, c.deviceID, c.userID)
+	return jsonHeaders(c.authToken, c.ct0, c.clientUUID, c.deviceID, c.cachedUserID())
 }
 
 // getBaseHeaders returns the base request headers without content-type.
 func (c *Client) getBaseHeaders() http.Header {
-	return baseHeaders(c.authToken, c.ct0, c.clientUUID, c.deviceID, c.userID)
+	return baseHeaders(c.authToken, c.ct0, c.clientUUID, c.deviceID, c.cachedUserID())
 }
 
 // getUploadHeaders returns headers for media upload requests.
 // Correction #70: upload uses base headers only.
 func (c *Client) getUploadHeaders() http.Header {
-	return uploadHeaders(c.authToken, c.ct0, c.clientUUID, c.deviceID, c.userID)
+	return uploadHeaders(c.authToken, c.ct0, c.clientUUID, c.deviceID, c.cachedUserID())
 }
 
 // ensureClientUserID resolves and caches the authenticated user's numeric ID.
 // Called lazily before operations that require it (lists, etc.).
 // Only a successful result is cached; errors are not, so callers may retry.
 func (c *Client) ensureClientUserID(ctx context.Context) error {
-	c.userIDMu.Lock()
-	defer c.userIDMu.Unlock()
-	if c.userID != "" {
+	// Fast path: already cached.
+	c.userIDMu.RLock()
+	id := c.userID
+	c.userIDMu.RUnlock()
+	if id != "" {
 		return nil
 	}
+
+	// Slow path: resolve without holding any lock (getCurrentUser uses the read lock
+	// internally via cachedUserID, so we must not hold the write lock during the call).
 	user, err := c.getCurrentUser(ctx)
 	if err != nil {
 		return err
 	}
-	c.userID = user.ID
+
+	c.userIDMu.Lock()
+	if c.userID == "" {
+		c.userID = user.ID
+	}
+	c.userIDMu.Unlock()
 	return nil
 }

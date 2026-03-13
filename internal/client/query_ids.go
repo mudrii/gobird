@@ -93,6 +93,14 @@ func scrapeQueryIDs(ctx context.Context) map[string]string {
 		"https://x.com/settings/account",
 	}
 	scriptRe := regexp.MustCompile(`https://abs\.twimg\.com/[^"' )]+\.js`)
+
+	// Precompile per-operation regexes once before the page loop to avoid
+	// recompiling inside the inner loop for every JS bundle.
+	operationREs := make(map[string]*regexp.Regexp, len(FallbackQueryIDs))
+	for operation := range FallbackQueryIDs {
+		operationREs[operation] = regexp.MustCompile(`([A-Za-z0-9_-]{20,})/` + regexp.QuoteMeta(operation) + `\b`)
+	}
+
 	found := map[string]string{}
 	client := &http.Client{Timeout: 15 * time.Second}
 	visitedScripts := map[string]bool{}
@@ -133,12 +141,11 @@ func scrapeQueryIDs(ctx context.Context) map[string]string {
 				continue
 			}
 			script := string(scriptBody)
-			for operation := range FallbackQueryIDs {
+			for operation, opRe := range operationREs {
 				if _, ok := found[operation]; ok {
 					continue
 				}
-				re := regexp.MustCompile(`([A-Za-z0-9_-]{20,})/` + regexp.QuoteMeta(operation) + `\b`)
-				if m := re.FindStringSubmatch(script); len(m) > 1 {
+				if m := opRe.FindStringSubmatch(script); len(m) > 1 {
 					found[operation] = m[1]
 				}
 			}

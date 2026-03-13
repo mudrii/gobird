@@ -41,8 +41,11 @@ func MapTweetResultWithOptions(raw *types.WireRawTweet, opts TweetParseOptions) 
 		IsBlueVerified: raw.IsBlueVerified, // top-level field, NOT inside legacy (correction #8)
 	}
 
+	// Text is always extracted regardless of legacy presence, so that article
+	// and note tweet sources are not silently dropped when legacy is nil.
+	td.Text = ExtractTweetText(raw)
+
 	if raw.Legacy != nil {
-		td.Text = ExtractTweetText(raw)
 		td.CreatedAt = raw.Legacy.CreatedAt
 		td.ConversationID = raw.Legacy.ConversationIDStr
 		td.InReplyToStatusID = raw.Legacy.InReplyToStatusIDStr

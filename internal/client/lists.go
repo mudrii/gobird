@@ -21,7 +21,7 @@ func (c *Client) GetOwnedLists(ctx context.Context, opts *types.FetchOptions) (*
 	if err := c.ensureClientUserID(ctx); err != nil {
 		return nil, err
 	}
-	return c.fetchLists(ctx, "ListOwnerships", c.userID, opts)
+	return c.fetchLists(ctx, "ListOwnerships", c.cachedUserID(), opts)
 }
 
 // GetListMemberships returns the lists the authenticated user is a member of.
@@ -33,7 +33,7 @@ func (c *Client) GetListMemberships(ctx context.Context, opts *types.FetchOption
 	if err := c.ensureClientUserID(ctx); err != nil {
 		return nil, err
 	}
-	return c.fetchLists(ctx, "ListMemberships", c.userID, opts)
+	return c.fetchLists(ctx, "ListMemberships", c.cachedUserID(), opts)
 }
 
 // fetchLists paginates a list operation (ListOwnerships or ListMemberships).

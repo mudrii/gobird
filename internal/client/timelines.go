@@ -347,7 +347,7 @@ func (c *Client) GetLikes(ctx context.Context, opts *types.FetchOptions) types.T
 	if err := c.ensureClientUserID(ctx); err != nil {
 		return types.TweetResult{Success: false, Error: err}
 	}
-	userID := c.userID
+	userID := c.cachedUserID()
 
 	queryIDs := c.getQueryIDs("Likes")
 	refreshed := false

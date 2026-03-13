@@ -20,7 +20,12 @@ type httpError struct {
 }
 
 func (e *httpError) Error() string {
-	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, e.Body)
+	body := e.Body
+	const maxBodyLen = 200
+	if len(body) > maxBodyLen {
+		body = body[:maxBodyLen] + "…"
+	}
+	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, body)
 }
 
 // is404 reports whether err is an HTTP 404 error.

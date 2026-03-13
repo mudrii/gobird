@@ -112,9 +112,32 @@ func firstNonEmptyString(vals ...string) string {
 	return ""
 }
 
-// loadMedia reads file bytes from the given path.
+// maxMediaBytes is the maximum file size accepted for media uploads (512 MiB).
+const maxMediaBytes = 512 * 1024 * 1024
+
+// allowedMediaMIMEPrefixes lists the MIME type prefixes accepted by Twitter's media API.
+var allowedMediaMIMEPrefixes = []string{"image/", "video/", "audio/"}
+
+// loadMedia reads file bytes from the given path and enforces a size limit.
 func loadMedia(path string) ([]byte, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if fi.Size() > maxMediaBytes {
+		return nil, fmt.Errorf("media file too large: %d bytes (max %d)", fi.Size(), maxMediaBytes)
+	}
 	return os.ReadFile(path)
+}
+
+// validateMediaMIME returns an error when mimeType is not an accepted media type.
+func validateMediaMIME(mimeType string) error {
+	for _, prefix := range allowedMediaMIMEPrefixes {
+		if strings.HasPrefix(mimeType, prefix) {
+			return nil
+		}
+	}
+	return fmt.Errorf("unsupported media type %q: must be image, video, or audio", mimeType)
 }
 
 // detectMime returns the MIME type of the file by reading its first 512 bytes.
