@@ -3,8 +3,10 @@ package bird_test
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/mudrii/gobird/internal/testutil"
@@ -242,6 +244,42 @@ func TestClient_Tweet_Wrapper(t *testing.T) {
 	}
 	if id != "newtweet1" {
 		t.Errorf("Tweet ID: want newtweet1, got %q", id)
+	}
+}
+
+func TestClient_UploadMedia_Wrapper(t *testing.T) {
+	srv := testutil.NewTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{}`))
+			return
+		}
+
+		body, _ := io.ReadAll(r.Body)
+		bodyStr := string(body)
+		switch {
+		case strings.Contains(bodyStr, "command=INIT"):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"media_id_string":"media-wrap-1"}`))
+		case strings.Contains(r.Header.Get("Content-Type"), "multipart"):
+			w.WriteHeader(http.StatusNoContent)
+		case strings.Contains(bodyStr, "command=FINALIZE"):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{}`))
+		}
+	}))
+	defer srv.Close()
+
+	c := newMockClient(t, srv, nil)
+	mediaID, err := c.UploadMedia(context.Background(), []byte("small image data"), "image/png", "")
+	if err != nil {
+		t.Fatalf("UploadMedia: %v", err)
+	}
+	if mediaID != "media-wrap-1" {
+		t.Fatalf("media ID = %q, want %q", mediaID, "media-wrap-1")
 	}
 }
 

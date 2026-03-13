@@ -86,9 +86,15 @@ func (c *Client) mediaInit(ctx context.Context, totalBytes int, mimeType string)
 func (c *Client) mediaAppend(ctx context.Context, mediaID string, segmentIndex int, chunk []byte) error {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
-	_ = mw.WriteField("command", "APPEND")
-	_ = mw.WriteField("media_id", mediaID)
-	_ = mw.WriteField("segment_index", strconv.Itoa(segmentIndex))
+	if err := mw.WriteField("command", "APPEND"); err != nil {
+		return fmt.Errorf("APPEND: write command: %w", err)
+	}
+	if err := mw.WriteField("media_id", mediaID); err != nil {
+		return fmt.Errorf("APPEND: write media ID: %w", err)
+	}
+	if err := mw.WriteField("segment_index", strconv.Itoa(segmentIndex)); err != nil {
+		return fmt.Errorf("APPEND: write segment index: %w", err)
+	}
 	fw, err := mw.CreateFormField("media")
 	if err != nil {
 		return err

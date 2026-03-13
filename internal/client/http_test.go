@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -345,6 +346,24 @@ func TestIs404_edgeCases(t *testing.T) {
 				t.Errorf("is404(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestHTTPStatusCode(t *testing.T) {
+	err := fmt.Errorf("wrapped: %w", &httpError{StatusCode: 429, Body: "rate limited"})
+	status, ok := HTTPStatusCode(err)
+	if !ok {
+		t.Fatal("HTTPStatusCode should recognize wrapped httpError")
+	}
+	if status != 429 {
+		t.Fatalf("HTTPStatusCode() = %d, want 429", status)
+	}
+}
+
+func TestHTTPStatusCode_NoHTTPError(t *testing.T) {
+	status, ok := HTTPStatusCode(errors.New("plain error"))
+	if ok {
+		t.Fatalf("HTTPStatusCode should reject non-httpError, got status %d", status)
 	}
 }
 

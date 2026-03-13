@@ -32,4 +32,4 @@ coverage:
 clean:
 	rm -rf bin coverage.out coverage.html
 
-ci: vet test test-race build
+ci: vet test test-race lint build

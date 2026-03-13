@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mudrii/gobird/internal/client"
 	"github.com/mudrii/gobird/pkg/bird"
 	"github.com/spf13/cobra"
 )
@@ -143,6 +144,14 @@ func ExitCode(err error) int {
 	}
 	if errors.Is(err, bird.ErrRateLimit) {
 		return 4
+	}
+	if status, ok := client.HTTPStatusCode(err); ok {
+		switch status {
+		case 401, 403:
+			return 3
+		case 429:
+			return 4
+		}
 	}
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return 1

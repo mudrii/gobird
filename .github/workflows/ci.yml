@@ -32,5 +32,10 @@ jobs:
       - name: Race
         run: go test -race ./...
 
+      - name: Lint
+        run: golangci-lint run
+
       - name: Build
-        run: go build -ldflags "-X main.version=ci -X main.gitSHA=${{ github.sha }}" ./cmd/gobird
+        run: |
+          mkdir -p bin
+          go build -ldflags "-X main.version=ci -X main.gitSHA=${{ github.sha }}" -o bin/gobird ./cmd/gobird

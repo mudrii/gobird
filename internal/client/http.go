@@ -38,6 +38,14 @@ func is404(err error) bool {
 	return he.StatusCode == 404
 }
 
+// HTTPStatusCode extracts an HTTP status code from an error returned by this package.
+func HTTPStatusCode(err error) (int, bool) {
+	var he *httpError
+	if !errors.As(err, &he) {
+		return 0, false
+	}
+	return he.StatusCode, true
+}
 
 // doGET performs a GET request with the given headers and returns the response body.
 func (c *Client) doGET(ctx context.Context, url string, headers http.Header) ([]byte, error) {
