@@ -96,7 +96,9 @@ func (c *Client) mediaAppend(ctx context.Context, mediaID string, segmentIndex i
 	if _, err := fw.Write(chunk); err != nil {
 		return err
 	}
-	mw.Close()
+	if err := mw.Close(); err != nil {
+		return fmt.Errorf("APPEND: close multipart writer: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, MediaUploadURL, &buf)
 	if err != nil {
@@ -115,7 +117,9 @@ func (c *Client) mediaAppend(ctx context.Context, mediaID string, segmentIndex i
 		return err
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		return fmt.Errorf("APPEND: drain body: %w", err)
+	}
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("APPEND: HTTP %d", resp.StatusCode)
 	}

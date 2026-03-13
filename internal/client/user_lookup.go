@@ -28,9 +28,6 @@ func (c *Client) GetUserIDByUsername(ctx context.Context, username string) (stri
 // GetUserAboutAccount returns profile information for the given username.
 // Uses AboutAccountQuery with withRefreshedQueryIDsOn404.
 func (c *Client) GetUserAboutAccount(ctx context.Context, username string) (*types.TwitterUser, error) {
-	var result *types.TwitterUser
-	var lastErr error
-
 	attempt := func() attemptResult {
 		queryID := c.getQueryID("AboutAccountQuery")
 		vars := map[string]any{
@@ -72,7 +69,7 @@ func (c *Client) GetUserAboutAccount(ctx context.Context, username string) (*typ
 	if ap == nil {
 		return nil, fmt.Errorf("about_profile not found for %q", username)
 	}
-	result = &types.TwitterUser{
+	return &types.TwitterUser{
 		ID:              ap.UserID,
 		Username:        ap.ScreenName,
 		Name:            ap.Name,
@@ -81,10 +78,7 @@ func (c *Client) GetUserAboutAccount(ctx context.Context, username string) (*typ
 		FollowingCount:  ap.FriendsCount,
 		ProfileImageURL: ap.ProfileImageURLHTTPS,
 		CreatedAt:       ap.CreatedAt,
-	}
-	lastErr = nil
-	_ = lastErr
-	return result, nil
+	}, nil
 }
 
 // aboutProfileWire is the wire shape for about_profile.
@@ -128,7 +122,6 @@ func (c *Client) fetchUserByScreenName(ctx context.Context, username string) (*t
 		return nil, err
 	}
 
-	var had404 bool
 	for _, queryID := range queryIDs {
 		reqURL := fmt.Sprintf("%s/%s/UserByScreenName?variables=%s&features=%s&fieldToggles=%s",
 			GraphQLBaseURL, queryID,
@@ -139,7 +132,6 @@ func (c *Client) fetchUserByScreenName(ctx context.Context, username string) (*t
 		body, err := c.doGET(ctx, reqURL, c.getJsonHeaders())
 		if err != nil {
 			if is404(err) {
-				had404 = true
 				continue
 			}
 			return nil, err
@@ -155,7 +147,6 @@ func (c *Client) fetchUserByScreenName(ctx context.Context, username string) (*t
 			return user, nil
 		}
 	}
-	_ = had404
 
 	// REST fallback: users/show.json (correction #55).
 	restURL := fmt.Sprintf("%s?screen_name=%s", UserLookupRESTURL, url.QueryEscape(username))

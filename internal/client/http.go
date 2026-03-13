@@ -109,15 +109,16 @@ func (c *Client) fetchWithRetry(ctx context.Context, url string, headers http.He
 
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		resp, err := c.httpClient.Do(func() *http.Request {
-			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-			for k, vs := range headers {
-				for _, v := range vs {
-					req.Header.Add(k, v)
-				}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		for k, vs := range headers {
+			for _, v := range vs {
+				req.Header.Add(k, v)
 			}
-			return req
-		}())
+		}
+		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			return nil, err
 		}

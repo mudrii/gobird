@@ -37,7 +37,9 @@ func loadFeatureOverrides() featureOverrideConfig {
 		if len(payload) == 0 {
 			return
 		}
-		_ = json.Unmarshal(payload, &featureOverrides)
+		if err := json.Unmarshal(payload, &featureOverrides); err != nil {
+			featureOverrides = featureOverrideConfig{}
+		}
 	})
 	return featureOverrides
 }

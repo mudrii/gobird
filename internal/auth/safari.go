@@ -16,7 +16,7 @@ import (
 func extractSafari() (*types.TwitterCookies, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Safari: home directory: %w", err)
 	}
 	// Safari on macOS stores cookies in a SQLite DB under Library/Cookies/Cookies.db.
 	dbPath := filepath.Join(home, "Library", "Containers", "com.apple.Safari", "Data",
@@ -30,7 +30,7 @@ func extractSafari() (*types.TwitterCookies, error) {
 	}
 	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro&immutable=1")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Safari: open cookie database: %w", err)
 	}
 	defer db.Close()
 
@@ -38,7 +38,7 @@ func extractSafari() (*types.TwitterCookies, error) {
 		`SELECT domain, name, value FROM cookies WHERE name IN ('auth_token','ct0') AND (domain LIKE '%x.com' OR domain LIKE '%twitter.com')`,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Safari: query cookies: %w", err)
 	}
 	defer rows.Close()
 

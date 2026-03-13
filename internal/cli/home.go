@@ -43,7 +43,9 @@ func newHomeCmd() *cobra.Command {
 			}
 			fmtOpts := currentFormatOptions()
 			for _, t := range result.Items {
-				fmt.Fprintln(cmd.OutOrStdout(), output.FormatTweet(t, fmtOpts))
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), output.FormatTweet(t, fmtOpts)); err != nil {
+					return err
+				}
 			}
 			return nil
 		},

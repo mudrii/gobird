@@ -42,7 +42,9 @@ func newBookmarksCmd() *cobra.Command {
 			}
 			fmtOpts := currentFormatOptions()
 			for _, t := range result.Items {
-				fmt.Fprintln(cmd.OutOrStdout(), output.FormatTweet(t, fmtOpts))
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), output.FormatTweet(t, fmtOpts)); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -72,7 +74,9 @@ func newUnbookmarkCmd() *cobra.Command {
 			if err := c.Unbookmark(cmd.Context(), tweetID); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "unbookmarked %s\n", tweetID)
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "unbookmarked %s\n", tweetID); err != nil {
+				return err
+			}
 			return nil
 		},
 	}

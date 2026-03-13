@@ -16,7 +16,7 @@ import (
 func extractFirefox(profileHint string) (*types.TwitterCookies, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Firefox: home directory: %w", err)
 	}
 
 	profileDir := filepath.Join(home, "Library", "Application Support", "Firefox", "Profiles")
@@ -68,7 +68,7 @@ func extractFirefox(profileHint string) (*types.TwitterCookies, error) {
 func readFirefoxCookies(dbPath string) ([]domainCookie, error) {
 	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro&immutable=1")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Firefox: open cookie database: %w", err)
 	}
 	defer db.Close()
 
@@ -76,7 +76,7 @@ func readFirefoxCookies(dbPath string) ([]domainCookie, error) {
 		`SELECT host, name, value FROM moz_cookies WHERE name IN ('auth_token','ct0') AND (host LIKE '%x.com' OR host LIKE '%twitter.com')`,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Firefox: query cookies: %w", err)
 	}
 	defer rows.Close()
 

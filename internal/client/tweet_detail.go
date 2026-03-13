@@ -52,9 +52,18 @@ func (c *Client) fetchTweetDetail(ctx context.Context, focalTweetID string, curs
 	features := buildFetchTweetDetailFeatures()
 	fieldToggles := buildArticleFieldToggles()
 
-	varsJSON, _ := json.Marshal(vars)
-	featuresJSON, _ := json.Marshal(features)
-	togglesJSON, _ := json.Marshal(fieldToggles)
+	varsJSON, err := json.Marshal(vars)
+	if err != nil {
+		return nil, fmt.Errorf("fetchTweetDetail: marshal vars: %w", err)
+	}
+	featuresJSON, err := json.Marshal(features)
+	if err != nil {
+		return nil, fmt.Errorf("fetchTweetDetail: marshal features: %w", err)
+	}
+	togglesJSON, err := json.Marshal(fieldToggles)
+	if err != nil {
+		return nil, fmt.Errorf("fetchTweetDetail: marshal fieldToggles: %w", err)
+	}
 
 	tryQueryIDs := func(queryIDs []string) ([]byte, error, bool) {
 		had404 := false
@@ -140,8 +149,9 @@ func (c *Client) GetTweet(ctx context.Context, tweetID string, opts *types.Tweet
 	}
 	if opts.IncludeRaw {
 		var rawAny any
-		_ = json.Unmarshal(body, &rawAny)
-		td.Raw = rawAny
+		if err := json.Unmarshal(body, &rawAny); err == nil {
+			td.Raw = rawAny
+		}
 	}
 	return td, nil
 }

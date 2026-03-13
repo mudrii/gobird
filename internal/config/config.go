@@ -102,7 +102,12 @@ func defaultConfigPaths() []string {
 	if err != nil {
 		return nil
 	}
-	cwd, _ := os.Getwd()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return []string{
+			filepath.Join(home, ".config", "bird", "config.json5"),
+		}
+	}
 	return []string{
 		filepath.Join(home, ".config", "bird", "config.json5"),
 		filepath.Join(cwd, ".birdrc.json5"),

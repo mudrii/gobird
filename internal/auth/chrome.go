@@ -44,7 +44,7 @@ func extractChrome(profileHint string) (*types.TwitterCookies, error) {
 
 	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro&immutable=1")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Chrome: open cookie database: %w", err)
 	}
 	defer db.Close()
 
@@ -52,7 +52,7 @@ func extractChrome(profileHint string) (*types.TwitterCookies, error) {
 		`SELECT host_key, name, encrypted_value FROM cookies WHERE name IN ('auth_token','ct0') AND (host_key LIKE '%x.com' OR host_key LIKE '%twitter.com')`,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Chrome: query cookies: %w", err)
 	}
 	defer rows.Close()
 

@@ -34,7 +34,9 @@ func newNewsCmd() *cobra.Command {
 			}
 			fmtOpts := currentFormatOptions()
 			for _, n := range items {
-				fmt.Fprintln(cmd.OutOrStdout(), output.FormatNewsItem(n, fmtOpts))
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), output.FormatNewsItem(n, fmtOpts)); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -70,7 +72,9 @@ func newTrendingCmd() *cobra.Command {
 			}
 			fmtOpts := currentFormatOptions()
 			for _, n := range items {
-				fmt.Fprintln(cmd.OutOrStdout(), output.FormatNewsItem(n, fmtOpts))
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), output.FormatNewsItem(n, fmtOpts)); err != nil {
+					return err
+				}
 			}
 			return nil
 		},

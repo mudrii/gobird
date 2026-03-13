@@ -36,7 +36,9 @@ func newListsCmd() *cobra.Command {
 			}
 			fmtOpts := currentFormatOptions()
 			for _, l := range result.Items {
-				fmt.Fprintln(cmd.OutOrStdout(), output.FormatList(l, fmtOpts))
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), output.FormatList(l, fmtOpts)); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -75,7 +77,9 @@ func newListTimelineCmd() *cobra.Command {
 			}
 			fmtOpts := currentFormatOptions()
 			for _, t := range result.Items {
-				fmt.Fprintln(cmd.OutOrStdout(), output.FormatTweet(t, fmtOpts))
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), output.FormatTweet(t, fmtOpts)); err != nil {
+					return err
+				}
 			}
 			return nil
 		},

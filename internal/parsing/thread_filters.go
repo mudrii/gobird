@@ -4,7 +4,6 @@ import "github.com/mudrii/gobird/internal/types"
 
 // AddThreadMetadata annotates tweets in a thread with position metadata.
 func AddThreadMetadata(tweets []types.TweetData, authorID string) []types.TweetWithMeta {
-	_ = authorID
 	if len(tweets) == 0 {
 		return nil
 	}

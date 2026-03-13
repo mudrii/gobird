@@ -46,7 +46,9 @@ func newFollowingCmd() *cobra.Command {
 			}
 			fmtOpts := currentFormatOptions()
 			for _, u := range result.Items {
-				fmt.Fprintln(cmd.OutOrStdout(), output.FormatUser(u, fmtOpts))
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), output.FormatUser(u, fmtOpts)); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -96,7 +98,9 @@ func newFollowersCmd() *cobra.Command {
 			}
 			fmtOpts := currentFormatOptions()
 			for _, u := range result.Items {
-				fmt.Fprintln(cmd.OutOrStdout(), output.FormatUser(u, fmtOpts))
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), output.FormatUser(u, fmtOpts)); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -132,7 +136,9 @@ func newLikesCmd() *cobra.Command {
 			}
 			fmtOpts := currentFormatOptions()
 			for _, t := range result.Items {
-				fmt.Fprintln(cmd.OutOrStdout(), output.FormatTweet(t, fmtOpts))
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), output.FormatTweet(t, fmtOpts)); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -158,8 +164,8 @@ func newWhoamiCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "ID: %s\nUsername: @%s\nName: %s\n", u.ID, u.Username, u.Name)
-			return nil
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "ID: %s\nUsername: @%s\nName: %s\n", u.ID, u.Username, u.Name)
+			return err
 		},
 	}
 }
@@ -179,9 +185,9 @@ func newAboutCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "ID: %s\nUsername: @%s\nName: %s\nFollowers: %d\nFollowing: %d\nCreated: %s\n",
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "ID: %s\nUsername: @%s\nName: %s\nFollowers: %d\nFollowing: %d\nCreated: %s\n",
 				u.ID, u.Username, u.Name, u.FollowersCount, u.FollowingCount, u.CreatedAt)
-			return nil
+			return err
 		},
 	}
 }
@@ -210,8 +216,8 @@ func newFollowCmd() *cobra.Command {
 			if err := c.Follow(cmd.Context(), userID); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "followed %s\n", label)
-			return nil
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "followed %s\n", label)
+			return err
 		},
 	}
 }
@@ -240,8 +246,8 @@ func newUnfollowCmd() *cobra.Command {
 			if err := c.Unfollow(cmd.Context(), userID); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "unfollowed %s\n", label)
-			return nil
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "unfollowed %s\n", label)
+			return err
 		},
 	}
 }

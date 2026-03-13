@@ -20,8 +20,8 @@ func newCheckCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("FAIL: %w", err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "OK: @%s\n", u.Username)
-			return nil
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "OK: @%s\n", u.Username)
+			return err
 		},
 	}
 }
