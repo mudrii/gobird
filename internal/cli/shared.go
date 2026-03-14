@@ -197,7 +197,7 @@ func validateOutputFlags() error {
 		count++
 	}
 	if count > 1 {
-		return fmt.Errorf("invalid flags: --json, --json-full, and --plain are mutually exclusive")
+		return markUsageError(fmt.Errorf("invalid flags: --json, --json-full, and --plain are mutually exclusive"))
 	}
 	return nil
 }
@@ -205,7 +205,7 @@ func validateOutputFlags() error {
 // validateLimit returns an error when limit is negative.
 func validateLimit(limit int) error {
 	if limit < 0 {
-		return fmt.Errorf("invalid value: --count / --limit must be >= 0, got %d", limit)
+		return markUsageError(fmt.Errorf("invalid value: --count / --limit must be >= 0, got %d", limit))
 	}
 	return nil
 }

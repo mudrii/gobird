@@ -49,12 +49,25 @@ func executeCmd(t *testing.T, args ...string) (string, string, error) {
 	return stdout.String(), stderr.String(), err
 }
 
+func isolateCredentialSources(t *testing.T) {
+	t.Helper()
+	for _, e := range []string{
+		"AUTH_TOKEN",
+		"TWITTER_AUTH_TOKEN",
+		"CT0",
+		"TWITTER_CT0",
+		"BIRD_CONFIG",
+		"CHROME_SAFE_STORAGE_PASSWORD",
+	} {
+		t.Setenv(e, "")
+	}
+	t.Setenv("HOME", t.TempDir())
+}
+
 // --- check command tests ---
 
 func TestCheck_NoCredentials(t *testing.T) {
-	for _, e := range []string{"AUTH_TOKEN", "TWITTER_AUTH_TOKEN", "CT0", "TWITTER_CT0", "BIRD_CONFIG"} {
-		t.Setenv(e, "")
-	}
+	isolateCredentialSources(t)
 
 	_, _, err := executeCmd(t, "check",
 		"--config", filepath.Join(fixturesDir(), "config_minimal.json5"))
@@ -70,9 +83,7 @@ func TestCheck_WithMockedAPI(t *testing.T) {
 	_ = srv // We cannot easily inject the mock server into the CLI's resolveClient
 	// without modifying the CLI code. Instead, test that the command
 	// rejects bad credential formats.
-	for _, e := range []string{"AUTH_TOKEN", "TWITTER_AUTH_TOKEN", "CT0", "TWITTER_CT0", "BIRD_CONFIG"} {
-		t.Setenv(e, "")
-	}
+	isolateCredentialSources(t)
 
 	_, _, err := executeCmd(t, "check",
 		"--auth-token", "not-a-valid-token",
@@ -95,9 +106,7 @@ func TestSearch_MissingQuery(t *testing.T) {
 }
 
 func TestSearch_NoCredentials(t *testing.T) {
-	for _, e := range []string{"AUTH_TOKEN", "TWITTER_AUTH_TOKEN", "CT0", "TWITTER_CT0", "BIRD_CONFIG"} {
-		t.Setenv(e, "")
-	}
+	isolateCredentialSources(t)
 
 	_, _, err := executeCmd(t, "search", "golang",
 		"--config", filepath.Join(fixturesDir(), "config_minimal.json5"))
@@ -119,9 +128,7 @@ func TestRead_InvalidTweetID(t *testing.T) {
 }
 
 func TestRead_ValidURLFormat_NoAuth(t *testing.T) {
-	for _, e := range []string{"AUTH_TOKEN", "TWITTER_AUTH_TOKEN", "CT0", "TWITTER_CT0", "BIRD_CONFIG"} {
-		t.Setenv(e, "")
-	}
+	isolateCredentialSources(t)
 
 	_, _, err := executeCmd(t, "read", "https://x.com/user/status/12345",
 		"--config", filepath.Join(fixturesDir(), "config_minimal.json5"))
@@ -186,9 +193,7 @@ func TestError_AuthFailure_ExitCode(t *testing.T) {
 }
 
 func TestError_InvalidCredentialFormat(t *testing.T) {
-	for _, e := range []string{"AUTH_TOKEN", "TWITTER_AUTH_TOKEN", "CT0", "TWITTER_CT0", "BIRD_CONFIG"} {
-		t.Setenv(e, "")
-	}
+	isolateCredentialSources(t)
 
 	_, _, err := executeCmd(t, "check",
 		"--auth-token", "short",

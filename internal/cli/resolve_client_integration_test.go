@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,10 +27,10 @@ func loadCLIFixture(t *testing.T, name string) string {
 	return string(data)
 }
 
-func withResolvedClient(t *testing.T, c *client.Client, err error) {
+func withResolvedClient(t *testing.T, c *client.Client) {
 	t.Helper()
 	prev := resolveClientFunc
-	resolveClientFunc = func() (*client.Client, error) { return c, err }
+	resolveClientFunc = func() (*client.Client, error) { return c, nil }
 	t.Cleanup(func() {
 		resolveClientFunc = prev
 	})
@@ -40,7 +42,7 @@ func TestCheckCmd_WithResolvedClientSuccess(t *testing.T) {
 
 	withResolvedClient(t, client.New("fake-auth", "fake-ct0", &client.Options{
 		HTTPClient: testutil.NewHTTPClientForServer(srv),
-	}), nil)
+	}))
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -66,7 +68,7 @@ func TestReadCmd_WithResolvedClientJSON(t *testing.T) {
 		QueryIDCache: map[string]string{
 			"TweetDetail": "testQID",
 		},
-	}), nil)
+	}))
 
 	cmd := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -89,7 +91,7 @@ func TestCheckCmd_WithResolvedClientAuthFailure(t *testing.T) {
 
 	withResolvedClient(t, client.New("fake-auth", "fake-ct0", &client.Options{
 		HTTPClient: testutil.NewHTTPClientForServer(srv),
-	}), nil)
+	}))
 
 	cmd := NewRootCmd()
 	cmd.SetOut(&bytes.Buffer{})
@@ -102,5 +104,35 @@ func TestCheckCmd_WithResolvedClientAuthFailure(t *testing.T) {
 	}
 	if got := ExitCode(err); got != 3 {
 		t.Fatalf("ExitCode(auth failure) = %d, want 3 (err=%v)", got, err)
+	}
+}
+
+func TestCheckCmd_WithResolvedClientDNSFailure(t *testing.T) {
+	withResolvedClient(t, client.New("fake-auth", "fake-ct0", &client.Options{
+		HTTPClient: &http.Client{
+			Transport: testutil.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+				return nil, &net.DNSError{
+					Err:        "no such host",
+					Name:       r.URL.Host,
+					IsNotFound: true,
+				}
+			}),
+		},
+	}))
+
+	cmd := NewRootCmd()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"check"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected DNS failure")
+	}
+	if !strings.Contains(err.Error(), "no such host") {
+		t.Fatalf("expected DNS failure details, got %v", err)
+	}
+	if got := ExitCode(err); got != 1 {
+		t.Fatalf("ExitCode(dns failure) = %d, want 1 (err=%v)", got, err)
 	}
 }

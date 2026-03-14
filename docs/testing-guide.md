@@ -384,7 +384,9 @@ Do not target 100% coverage on:
 The following are explicitly excluded from unit tests due to external dependencies:
 
 - **`scrapeQueryIDs`**: Makes real HTTP requests to x.com. Tests inject a no-op `c.scraper` function (`func(_ context.Context) map[string]string { return nil }`) to prevent network calls.
-- **Browser cookie extraction** (`chrome.go`, `safari.go`, `firefox.go`): Requires a real browser installation, a logged-in session, and on macOS, Keychain access. These are tested only in manual or acceptance test runs.
+- **Browser cookie extraction** has both unit and manual coverage:
+  - unit tests cover Chrome decryption variants, Safari binarycookies parsing, and Firefox profile scanning using temp fixtures
+  - real browser/keychain behavior is still validated manually or via environment-specific acceptance runs
 - **Integration tests** (`tests/integration/`): Require real `AUTH_TOKEN` and `CT0` environment variables. Run them explicitly, not via `make test`.
 
 ---

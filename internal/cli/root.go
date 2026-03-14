@@ -12,21 +12,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var usageErrorMarkers = []string{
-	"invalid value",
+var usageErrorPrefixes = []string{
 	"unknown command",
 	"unknown flag",
 	"missing required flag",
 	"accepts ",
 	"requires ",
+	"invalid value",
 	"must be a numeric user ID",
 	"more --alt values than --media values",
 	"mutually exclusive",
-}
-
-var usageErrorPrefixes = []string{
 	"invalid flags:",
-	"invalid value:",
 	"invalid tweet ID or URL:",
 	"invalid list ID or URL:",
 	"invalid handle:",
@@ -35,15 +31,33 @@ var usageErrorPrefixes = []string{
 	"media file too large:",
 }
 
+type usageError struct {
+	err error
+}
+
+func (e *usageError) Error() string {
+	return e.err.Error()
+}
+
+func (e *usageError) Unwrap() error {
+	return e.err
+}
+
+func markUsageError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &usageError{err: err}
+}
+
 func isUsageError(err error) bool {
+	var tagged *usageError
+	if errors.As(err, &tagged) {
+		return true
+	}
 	msg := err.Error()
 	for _, prefix := range usageErrorPrefixes {
 		if strings.HasPrefix(msg, prefix) {
-			return true
-		}
-	}
-	for _, marker := range usageErrorMarkers {
-		if strings.Contains(msg, marker) {
 			return true
 		}
 	}

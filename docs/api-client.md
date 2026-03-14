@@ -73,7 +73,7 @@ Tried only when tiers 1 and 2 both fail. The extraction order defaults to `["saf
 - `--cookie-source <name>` (one or more, repeatable)
 - `ResolveOptions.CookieSources` (programmatic)
 
-Each browser extractor reads the browser's cookie SQLite database for the `x.com` / `twitter.com` domain and extracts `auth_token` and `ct0` cookie values. `modernc.org/sqlite` is used for a pure-Go SQLite implementation with no system library requirement.
+Safari reads WebKit's cookie store (`Cookies.binarycookies` on modern macOS, with legacy SQLite fallback). Chrome and Firefox read their SQLite cookie stores for the `x.com` / `twitter.com` domain. `modernc.org/sqlite` is used for the SQLite-backed extractors with no system library requirement.
 
 An optional timeout (`--cookie-timeout` / `BIRD_COOKIE_TIMEOUT_MS`) wraps extraction in a goroutine with a context deadline to prevent hanging on locked databases.
 

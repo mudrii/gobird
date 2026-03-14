@@ -7,7 +7,7 @@ gobird is a Twitter/X client implemented in Go with two public surfaces:
 1. **CLI binary** (`gobird`) — a command-line tool that reads tweets, searches, manages bookmarks, follows/unfollows accounts, posts tweets, and inspects news/trending content. It is the primary end-user interface.
 2. **Go library** (`pkg/bird`) — a fully exported package that external Go programs can import to drive the same API operations programmatically.
 
-Both surfaces share one implementation path. The CLI constructs a `bird.Client`, calls the same methods any library consumer would call, and formats the results for the terminal.
+Both surfaces share one implementation path. The CLI resolves config and credentials, constructs an `internal/client.Client` directly, and formats the results for the terminal. The public library wraps the same internal client for external consumers.
 
 The underlying protocol is Twitter/X's private GraphQL and REST v1.1 APIs. gobird authenticates using session cookies extracted from a real browser (`auth_token` + `ct0`), mirroring what the x.com browser client sends. No official developer API key is required.
 
@@ -26,7 +26,7 @@ The underlying protocol is Twitter/X's private GraphQL and REST v1.1 APIs. gobir
 │  root.go, search.go, home.go, bookmarks.go, users.go,                    │
 │  lists.go, news.go, tweet.go, read.go, user_tweets.go, check.go,         │
 │  query_ids.go, shared.go                                                  │
-│  (cobra commands; resolves config + credentials, builds bird.Client,      │
+│  (cobra commands; resolves config + credentials, builds internal/client.Client, │
 │   formats output via internal/output)                                     │
 └──────────────────────────────────┬────────────────────────────────────────┘
                                    │ imports (public API)
@@ -111,7 +111,7 @@ Each layer may only import layers below it. `internal/types` has no internal imp
 | Package | Responsibility |
 |---|---|
 | `cmd/gobird` | Binary entrypoint. Calls `cli.SetBuildInfo` and `cli.NewRootCmd`, runs cobra, maps errors to exit codes. |
-| `internal/cli` | All cobra command definitions. Reads config, resolves credentials, builds `bird.Client`, dispatches API calls, formats output. |
+| `internal/cli` | All cobra command definitions. Reads config, resolves credentials, builds `internal/client.Client`, dispatches API calls, formats output. |
 | `internal/auth` | Three-tier credential resolution: CLI flags → environment variables → browser cookie extraction (Safari, Chrome, Firefox). Validates `auth_token` (40 hex chars) and `ct0` (32–160 alphanumeric chars). |
 | `internal/config` | Loads `~/.config/gobird/config.json5` and `./.gobirdrc.json5` (local overrides global). Accepts JSON5 via `hujson`. Applies env var overlay on top. |
 | `pkg/bird` | Public stable API surface. Contains type aliases (not re-declarations) for every type in `internal/types`. Wraps `internal/client.Client` in `bird.Client`. Delegates all methods one-for-one. |
@@ -135,7 +135,7 @@ internal/cli command handler
   │     ├─ Tier 1: --auth-token / --ct0 flags
   │     ├─ Tier 2: AUTH_TOKEN / CT0 env vars
   │     └─ Tier 3: Browser cookie stores (Safari WebKit store, Chrome/Firefox SQLite DBs)
-  ├─ Build client: bird.New(creds, opts)  →  internal/client.New(authToken, ct0, opts)
+  ├─ Build client: internal/client.New(authToken, ct0, opts)
   │     └─ Generates clientUUID and deviceID (uuid.NewString)
   │     └─ Seeds queryIDCache from opts.QueryIDCache if provided
   └─ Call API method (e.g., client.GetAllSearchResults)

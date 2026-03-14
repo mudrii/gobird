@@ -91,6 +91,9 @@ func ResolveCredentials(opts ResolveOptions) (*types.TwitterCookies, error) {
 	if err != nil {
 		return nil, fmt.Errorf("credential resolution failed: no valid credentials found (browser: %w)", err)
 	}
+	if err := validateCredentials(creds.AuthToken, creds.Ct0); err != nil {
+		return nil, fmt.Errorf("invalid credentials from browser: %w", err)
+	}
 	return creds, nil
 }
 

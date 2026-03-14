@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/mudrii/gobird/internal/client"
@@ -43,5 +44,12 @@ func TestExitCode_HTTPStatusMappings(t *testing.T) {
 				t.Fatalf("ExitCode(%v) = %d, want %d", err, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestExitCode_RuntimeErrorContainingInvalidText(t *testing.T) {
+	err := fmt.Errorf("runtime failure: invalid upstream response body")
+	if got := ExitCode(err); got != 1 {
+		t.Fatalf("ExitCode(%v) = %d, want 1", err, got)
 	}
 }
