@@ -8,6 +8,12 @@ import (
 	"github.com/mudrii/gobird/internal/types"
 )
 
+var (
+	safariExtractor  = extractSafariWithContext
+	chromeExtractor  = extractChromeWithContext
+	firefoxExtractor = extractFirefoxWithContext
+)
+
 // extractFromBrowserOrder tries each supported browser in order.
 func extractFromBrowserOrder(order []string, opts ResolveOptions) (*types.TwitterCookies, error) {
 	type extractor struct {
@@ -15,12 +21,12 @@ func extractFromBrowserOrder(order []string, opts ResolveOptions) (*types.Twitte
 		fn   func(context.Context) (*types.TwitterCookies, error)
 	}
 	all := []extractor{
-		{"safari", func(ctx context.Context) (*types.TwitterCookies, error) { return extractSafariWithContext(ctx) }},
+		{"safari", safariExtractor},
 		{"chrome", func(ctx context.Context) (*types.TwitterCookies, error) {
-			return extractChromeWithContext(ctx, opts.ChromeProfile)
+			return chromeExtractor(ctx, opts.ChromeProfile)
 		}},
 		{"firefox", func(ctx context.Context) (*types.TwitterCookies, error) {
-			return extractFirefoxWithContext(ctx, opts.FirefoxProfile)
+			return firefoxExtractor(ctx, opts.FirefoxProfile)
 		}},
 	}
 	if len(order) == 0 {

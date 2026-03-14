@@ -11,6 +11,11 @@ import (
 	"github.com/tailscale/hujson"
 )
 
+var (
+	userHomeDirFunc = os.UserHomeDir
+	getwdFunc       = os.Getwd
+)
+
 // StringOrSlice decodes either a JSON string or string array into a slice.
 type StringOrSlice []string
 
@@ -105,11 +110,11 @@ func explicitOrEnvPath(explicit string) string {
 }
 
 func defaultConfigPaths() ([]string, error) {
-	home, homeErr := os.UserHomeDir()
+	home, homeErr := userHomeDirFunc()
 	if homeErr != nil {
 		return nil, fmt.Errorf("resolve home directory: %w", homeErr)
 	}
-	cwd, cwdErr := os.Getwd()
+	cwd, cwdErr := getwdFunc()
 	if cwdErr != nil {
 		return []string{
 			filepath.Join(home, ".config", "gobird", "config.json5"),

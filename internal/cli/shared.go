@@ -14,8 +14,14 @@ import (
 	"github.com/mudrii/gobird/internal/output"
 )
 
+var resolveClientFunc = resolveClientDefault
+
 // resolveClient builds an authenticated client from global flags and config file.
 func resolveClient() (*client.Client, error) {
+	return resolveClientFunc()
+}
+
+func resolveClientDefault() (*client.Client, error) {
 	cfg, err := config.Load(globalFlags.configPath)
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
