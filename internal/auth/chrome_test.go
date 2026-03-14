@@ -1,10 +1,14 @@
 package auth
 
 import (
+	"context"
 	"crypto/aes"
+	"crypto/sha256"
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -68,7 +72,7 @@ func TestChromeCookieCandidates_DirectFile(t *testing.T) {
 }
 
 func TestDecryptChromeCookie_ShortInput(t *testing.T) {
-	got, err := decryptChromeCookie([]byte("ab"), nil)
+	got, err := decryptChromeCookie(".x.com", []byte("ab"), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -79,7 +83,7 @@ func TestDecryptChromeCookie_ShortInput(t *testing.T) {
 
 func TestDecryptChromeCookie_NoPrefix(t *testing.T) {
 	plain := "plainvalue"
-	got, err := decryptChromeCookie([]byte(plain), nil)
+	got, err := decryptChromeCookie(".x.com", []byte(plain), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -92,7 +96,7 @@ func TestDecryptChromeCookie_InvalidCiphertextLength(t *testing.T) {
 	key := make([]byte, 16)
 	// v10 prefix + 5 bytes (not a multiple of block size)
 	enc := append([]byte("v10"), make([]byte, 5)...)
-	_, err := decryptChromeCookie(enc, key)
+	_, err := decryptChromeCookie(".x.com", enc, key)
 	if err == nil {
 		t.Fatal("expected error for invalid ciphertext length")
 	}
@@ -101,7 +105,7 @@ func TestDecryptChromeCookie_InvalidCiphertextLength(t *testing.T) {
 func TestDecryptChromeCookie_EmptyAfterPrefix(t *testing.T) {
 	key := make([]byte, 16)
 	enc := []byte("v10")
-	_, err := decryptChromeCookie(enc, key)
+	_, err := decryptChromeCookie(".x.com", enc, key)
 	if err == nil {
 		t.Fatal("expected error for empty ciphertext after prefix")
 	}
@@ -142,7 +146,7 @@ func TestDecryptChromeCookie_ValidV10(t *testing.T) {
 	}
 
 	enc := append([]byte("v10"), dst...)
-	got, err := decryptChromeCookie(enc, key)
+	got, err := decryptChromeCookie(".x.com", enc, key)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -181,12 +185,57 @@ func TestDecryptChromeCookie_V11Prefix(t *testing.T) {
 	}
 
 	enc := append([]byte("v11"), dst...)
-	got, err := decryptChromeCookie(enc, key)
+	got, err := decryptChromeCookie(".x.com", enc, key)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got != string(plaintext) {
 		t.Errorf("want %q, got %q", string(plaintext), got)
+	}
+}
+
+func TestDecryptChromeCookie_StripsHostHashPrefix(t *testing.T) {
+	password := []byte("testpassword")
+	key := pbkdf2SHA1(password, []byte("saltysalt"), 1003, 16)
+	host := ".x.com"
+	prefix := sha256.Sum256([]byte(host))
+	plaintext := append(prefix[:], []byte("3686ba089daa47ab494946db3f8e873eddb32d74")...)
+
+	padLen := aes.BlockSize - (len(plaintext) % aes.BlockSize)
+	padded := make([]byte, len(plaintext)+padLen)
+	copy(padded, plaintext)
+	for i := len(plaintext); i < len(padded); i++ {
+		padded[i] = byte(padLen)
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iv := []byte("                ")
+	dst := make([]byte, len(padded))
+	for i := 0; i < len(padded); i += aes.BlockSize {
+		xored := make([]byte, aes.BlockSize)
+		var ivBlock []byte
+		if i == 0 {
+			ivBlock = iv
+		} else {
+			ivBlock = dst[i-aes.BlockSize : i]
+		}
+		for j := 0; j < aes.BlockSize; j++ {
+			xored[j] = padded[i+j] ^ ivBlock[j]
+		}
+		block.Encrypt(dst[i:i+aes.BlockSize], xored)
+	}
+
+	enc := append([]byte("v10"), dst...)
+	got, err := decryptChromeCookie(host, enc, key)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := "3686ba089daa47ab494946db3f8e873eddb32d74"
+	if got != want {
+		t.Errorf("want %q, got %q", want, got)
 	}
 }
 
@@ -221,6 +270,48 @@ func TestExtractChrome_NoCookieDB(t *testing.T) {
 	_, err := extractChromeFromDir(dir, "")
 	if err == nil {
 		t.Fatal("expected error when no cookie DB exists")
+	}
+}
+
+func TestChromeCookieKey_UsesEnvironmentOverride(t *testing.T) {
+	prevLookup := chromeKeychainPasswordLookup
+	chromeKeychainPasswordLookup = func(ctx context.Context) (string, error) {
+		return "", errors.New("should not be called")
+	}
+	t.Cleanup(func() {
+		chromeKeychainPasswordLookup = prevLookup
+	})
+
+	t.Setenv(chromeSafeStoragePasswordEnv, "terminal-password")
+
+	key, err := chromeCookieKey(context.Background())
+	if err != nil {
+		t.Fatalf("chromeCookieKey: %v", err)
+	}
+
+	want := chromeCookieKeyFromPassword("terminal-password")
+	if string(key) != string(want) {
+		t.Fatalf("derived key mismatch")
+	}
+}
+
+func TestChromeCookieKey_KeychainErrorMentionsOverride(t *testing.T) {
+	prevLookup := chromeKeychainPasswordLookup
+	chromeKeychainPasswordLookup = func(ctx context.Context) (string, error) {
+		return "", errors.New("exit status 36")
+	}
+	t.Cleanup(func() {
+		chromeKeychainPasswordLookup = prevLookup
+	})
+
+	t.Setenv(chromeSafeStoragePasswordEnv, "")
+
+	_, err := chromeCookieKey(context.Background())
+	if err == nil {
+		t.Fatal("expected error when keychain lookup fails")
+	}
+	if !strings.Contains(err.Error(), chromeSafeStoragePasswordEnv) {
+		t.Fatalf("expected override hint in error, got %v", err)
 	}
 }
 

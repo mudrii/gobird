@@ -5,7 +5,7 @@
 - **Go**: 1.24 or later (see `go.mod`)
 - **golangci-lint**: for linting (`go install github.com/golangci-lint/golangci-lint/cmd/golangci-lint@latest` or via Homebrew)
 - **git**: for version injection into the binary
-- **macOS**: required for browser cookie extraction features (Chrome AES-CBC decryption via Keychain, Safari's `Cookies.db`, Firefox SQLite stores)
+- **macOS**: required for browser cookie extraction features (Chrome AES-CBC decryption via Keychain, Safari's WebKit cookie store, Firefox SQLite stores)
 
 No other tooling is required. The project uses only the Go standard library plus a small set of direct dependencies: `cobra`, `hujson`, `sqlite`, `uuid`.
 
@@ -42,7 +42,7 @@ gobird/
 
 **`cmd/gobird/`**: The `main` package. Sets `buildVersion` and `buildGitSHA` via ldflags, constructs the root cobra command via `cli.NewRootCmd()`, and calls `os.Exit(cli.ExitCode(err))`.
 
-**`internal/auth/`**: Credential resolution. `resolve.go` orchestrates a three-tier priority: CLI flags → environment variables → browser cookie extraction. `chrome.go` implements AES-128-CBC decryption using a key derived from macOS Keychain via PBKDF2-SHA1. `safari.go` reads `Cookies.db`. `firefox.go` reads `moz_cookies`. All use `modernc.org/sqlite` opened read-only with `?mode=ro&immutable=1`.
+**`internal/auth/`**: Credential resolution. `resolve.go` orchestrates a three-tier priority: CLI flags → environment variables → browser cookie extraction. `chrome.go` implements AES-128-CBC decryption using a key derived from macOS Keychain via PBKDF2-SHA1. `safari.go` reads Safari's WebKit cookie store, preferring `Cookies.binarycookies` and falling back to legacy `Cookies.db`. `firefox.go` reads `moz_cookies`. Chrome and Firefox use `modernc.org/sqlite` opened read-only with `?mode=ro&immutable=1`.
 
 **`internal/cli/`**: One file per command group. `root.go` defines global persistent flags and registers all subcommands. `shared.go` contains `resolveClient()` (the auth resolution + client construction chain used by every command). New commands are registered in `root.go` and implemented in their own file.
 
@@ -330,7 +330,7 @@ The set names correspond to the second argument of `applyFeatureOverrides()` in 
 
 All browser extractors open the cookie database read-only with `?mode=ro&immutable=1`. If extraction fails:
 
-**Chrome**: The extractor calls `security find-generic-password -w -a Chrome -s "Chrome Safe Storage"` to get the AES key from macOS Keychain. If Chrome is running, the database may be locked — close Chrome or use the `--chrome-profile-dir` flag to point at a backup copy of the Cookies file.
+**Chrome**: The extractor calls `security find-generic-password -w -a Chrome -s "Chrome Safe Storage"` to get the AES key from macOS Keychain. If that subprocess lookup is denied even though the command works interactively in Terminal, `CHROME_SAFE_STORAGE_PASSWORD` can be used as an explicit override. If Chrome is running, the database may be locked — close Chrome or use the `--chrome-profile-dir` flag to point at a backup copy of the Cookies file.
 
 Candidate paths searched (in order):
 1. Explicit `--chrome-profile-dir` or `--chrome-profile` if provided
@@ -338,7 +338,7 @@ Candidate paths searched (in order):
 3. `~/Library/Application Support/Google/Chrome/Profile 1/Cookies`
 4. `~/Library/Application Support/Chromium/Default/Cookies`
 
-**Safari**: Reads from `~/Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.db` (sandboxed), falling back to `~/Library/Cookies/Cookies.db`.
+**Safari**: Reads from `~/Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies` (sandboxed), falling back to `~/Library/Cookies/Cookies.binarycookies`, then legacy `Cookies.db` paths for older installs.
 
 **Firefox**: Scans all subdirectories of `~/Library/Application Support/Firefox/Profiles/` for `cookies.sqlite`. Use `--firefox-profile <name>` to narrow to a specific profile.
 

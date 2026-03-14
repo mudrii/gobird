@@ -1302,7 +1302,7 @@ Deliverables: `internal/auth/{cookies,resolve}.go`
 - Driver: `modernc.org/sqlite` (pure Go, no CGo)
 
 #### Safari cookie extraction (macOS):
-- File: `~/Library/Cookies/Cookies.binarycookies` (proprietary binary format, NOT SQLite)
+- File: `~/Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies` (modern Safari sandbox path; proprietary binary format, NOT SQLite)
 - Requires custom binary parser (see binary format spec in authentication.md)
 
 #### Firefox cookie extraction (macOS):

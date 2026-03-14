@@ -182,6 +182,7 @@ func TestResolveCredentials_TwitterEnvVars(t *testing.T) {
 // TestResolveCredentials_NoCredentials verifies that when no flags, no env vars,
 // and no browser cookies are available, an error is returned.
 func TestResolveCredentials_NoCredentials(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	t.Setenv("AUTH_TOKEN", "")
 	t.Setenv("CT0", "")
 	t.Setenv("TWITTER_AUTH_TOKEN", "")
@@ -233,6 +234,7 @@ func TestBuildCookieHeader(t *testing.T) {
 // TestFirstNonEmpty exercises the firstNonEmpty helper indirectly through
 // credential resolution with partial env vars.
 func TestFirstNonEmpty(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	primaryToken := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	twitterToken := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	primaryCt0 := "abcdef1234567890abcdef1234567890pp"

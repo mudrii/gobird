@@ -334,12 +334,14 @@ When multiple domain entries exist (e.g., `.x.com` and `.twitter.com`), the `x.c
 **Platform:** macOS only
 
 **Cookie store paths (tried in order):**
-1. `~/Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.db` (sandboxed Safari)
-2. `~/Library/Cookies/Cookies.db` (non-sandboxed fallback)
+1. `~/Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies` (modern sandboxed Safari)
+2. `~/Library/Cookies/Cookies.binarycookies` (modern non-sandboxed fallback)
+3. `~/Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.db` (legacy sandboxed fallback)
+4. `~/Library/Cookies/Cookies.db` (legacy non-sandboxed fallback)
 
-**Implementation:** Opens the SQLite DB in read-only immutable mode. Queries the `cookies` table for `name IN ('auth_token','ct0')`.
+**Implementation:** Prefers Safari's binary WebKit cookie store and falls back to the legacy SQLite store. For SQLite stores, `gobird` opens the DB in read-only immutable mode and queries `name IN ('auth_token','ct0')`.
 
-**Notes:** No decryption required — Safari stores cookie values as plaintext in the DB.
+**Notes:** No decryption required. `gobird` supports both Safari's modern `Cookies.binarycookies` store and the older plaintext SQLite cookie DB.
 
 ```sh
 # Explicitly select Safari:
@@ -364,7 +366,7 @@ gobird home --browser safari
 
 **Encryption:** Chrome encrypts cookie values with AES-128-CBC. The key is derived using PBKDF2-SHA1 (1003 iterations, salt `saltysalt`) from a password retrieved from the macOS Keychain under the service `Chrome Safe Storage`, account `Chrome`. Cookie values are prefixed with `v10` or `v11`.
 
-**Keychain access:** gobird calls `security find-generic-password -w -a Chrome -s "Chrome Safe Storage"`. This may trigger a macOS authorization dialog on first use. Use `--cookie-timeout` to set a deadline if Keychain access hangs.
+**Keychain access:** gobird calls `security find-generic-password -w -a Chrome -s "Chrome Safe Storage"`. This may trigger a macOS authorization dialog on first use. Use `--cookie-timeout` to set a deadline if Keychain access hangs. If the command succeeds in your terminal but Keychain denies `gobird` as a subprocess, export `CHROME_SAFE_STORAGE_PASSWORD` to the value returned by that command and retry.
 
 ```sh
 gobird home --browser chrome

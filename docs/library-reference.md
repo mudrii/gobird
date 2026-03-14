@@ -227,9 +227,11 @@ type ResolveOptions struct {
 func ExtractSafariCookies() (*TwitterCookies, error)
 ```
 
-Directly extracts cookies from Safari's SQLite cookie store. macOS only. Looks for the DB at:
+Directly extracts cookies from Safari's WebKit cookie store. macOS only. It checks these paths in order:
+- `~/Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies`
+- `~/Library/Cookies/Cookies.binarycookies`
 - `~/Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.db`
-- Fallback: `~/Library/Cookies/Cookies.db`
+- `~/Library/Cookies/Cookies.db`
 
 ### ExtractChromeCookies
 
@@ -244,7 +246,7 @@ Extracts cookies from Chrome or Chromium. The `profileHint` parameter selects a 
 - `"/absolute/path"` — treats as a directory, appends `Cookies`
 - `"/abs/path/Cookies"` or `"/abs/path/file.sqlite"` — uses that file directly
 
-macOS only. Decrypts cookie values using AES-128-CBC with a key from the macOS Keychain (`Chrome Safe Storage`).
+macOS only. Decrypts cookie values using AES-128-CBC with a key from the macOS Keychain (`Chrome Safe Storage`). If subprocess access to that Keychain item is denied, `CHROME_SAFE_STORAGE_PASSWORD` can be set explicitly.
 
 ### ExtractFirefoxCookies
 

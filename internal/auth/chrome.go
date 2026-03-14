@@ -6,6 +6,7 @@ import (
 	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/sha1"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/binary"
 	"fmt"
@@ -18,6 +19,10 @@ import (
 
 	"github.com/mudrii/gobird/internal/types"
 )
+
+const chromeSafeStoragePasswordEnv = "CHROME_SAFE_STORAGE_PASSWORD"
+
+var chromeKeychainPasswordLookup = defaultChromeKeychainPasswordLookup
 
 // extractChrome reads cookies from Chrome's SQLite cookie store on macOS.
 // Cookie values are AES-128-CBC encrypted with a key derived from the macOS Keychain.
@@ -82,7 +87,7 @@ func extractChromeWithContext(ctx context.Context, profileHint string) (result *
 		if err := rows.Scan(&host, &name, &enc); err != nil {
 			continue
 		}
-		val, err := decryptChromeCookie(enc, key)
+		val, err := decryptChromeCookie(host, enc, key)
 		if err != nil {
 			continue
 		}
@@ -128,24 +133,46 @@ func chromeCookieCandidates(home, profileHint string) []string {
 
 // chromeCookieKey retrieves the AES key from the macOS Keychain.
 func chromeCookieKey(ctx context.Context) ([]byte, error) {
+	password := strings.TrimSpace(os.Getenv(chromeSafeStoragePasswordEnv))
+	if password == "" {
+		var err error
+		password, err = chromeKeychainPasswordLookup(ctx)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"keychain access failed: %w; if macOS keychain access works in your terminal but not in gobird, export %s from `security find-generic-password -w -a Chrome -s \"Chrome Safe Storage\"` and retry",
+				err,
+				chromeSafeStoragePasswordEnv,
+			)
+		}
+		password = strings.TrimSpace(password)
+	}
+	if password == "" {
+		return nil, fmt.Errorf("%s is empty", chromeSafeStoragePasswordEnv)
+	}
+	return chromeCookieKeyFromPassword(password), nil
+}
+
+func defaultChromeKeychainPasswordLookup(ctx context.Context) (string, error) {
 	out, err := exec.CommandContext(
 		ctx,
 		"security", "find-generic-password",
 		"-w", "-a", "Chrome", "-s", "Chrome Safe Storage",
 	).Output()
 	if err != nil {
-		return nil, fmt.Errorf("keychain access failed: %w", err)
+		return "", err
 	}
-	password := strings.TrimSpace(string(out))
+	return string(out), nil
+}
+
+func chromeCookieKeyFromPassword(password string) []byte {
 	// Chrome derives a 128-bit (16-byte) AES key using PBKDF2-SHA1 with
 	// 1003 iterations and the fixed salt "saltysalt".
-	key := pbkdf2SHA1([]byte(password), []byte("saltysalt"), 1003, 16)
-	return key, nil
+	return pbkdf2SHA1([]byte(password), []byte("saltysalt"), 1003, 16)
 }
 
 // decryptChromeCookie decrypts a Chrome-encrypted cookie value.
 // Chrome cookies on macOS start with "v10" or "v11" prefix.
-func decryptChromeCookie(enc []byte, key []byte) (string, error) {
+func decryptChromeCookie(host string, enc []byte, key []byte) (string, error) {
 	if len(enc) < 3 {
 		return string(enc), nil
 	}
@@ -171,7 +198,14 @@ func decryptChromeCookie(enc []byte, key []byte) (string, error) {
 	if pad == 0 || pad > aes.BlockSize || pad > len(dst) {
 		return "", fmt.Errorf("invalid padding")
 	}
-	return string(dst[:len(dst)-pad]), nil
+	plaintext := dst[:len(dst)-pad]
+	if len(plaintext) >= sha256.Size {
+		hostHash := sha256.Sum256([]byte(host))
+		if hmac.Equal(plaintext[:sha256.Size], hostHash[:]) {
+			plaintext = plaintext[sha256.Size:]
+		}
+	}
+	return string(plaintext), nil
 }
 
 // pbkdf2SHA1 implements PBKDF2 with HMAC-SHA1 (RFC 2898) using only stdlib.

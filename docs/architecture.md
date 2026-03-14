@@ -133,7 +133,7 @@ internal/cli command handler
   ├─ Resolve credentials (internal/auth.ResolveCredentials)
   │     ├─ Tier 1: --auth-token / --ct0 flags
   │     ├─ Tier 2: AUTH_TOKEN / CT0 env vars
-  │     └─ Tier 3: Browser SQLite cookie DB (Safari/Chrome/Firefox)
+  │     └─ Tier 3: Browser cookie stores (Safari WebKit store, Chrome/Firefox SQLite DBs)
   ├─ Build client: bird.New(creds, opts)  →  internal/client.New(authToken, ct0, opts)
   │     └─ Generates clientUUID and deviceID (uuid.NewString)
   │     └─ Seeds queryIDCache from opts.QueryIDCache if provided

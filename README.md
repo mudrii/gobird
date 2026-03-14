@@ -382,6 +382,7 @@ Use `--no-color` to disable ANSI colour while keeping emoji. Use `--no-emoji` to
 | `TWITTER_AUTH_TOKEN` | Twitter `auth_token` cookie (alias) |
 | `CT0` | Twitter `ct0` cookie (preferred) |
 | `TWITTER_CT0` | Twitter `ct0` cookie (alias) |
+| `CHROME_SAFE_STORAGE_PASSWORD` | Optional macOS Chrome keychain password override for browser cookie decryption when Keychain subprocess access is denied |
 | `BIRD_CONFIG` | Explicit path to config file |
 | `BIRD_TIMEOUT_MS` | HTTP request timeout in milliseconds |
 | `BIRD_COOKIE_TIMEOUT_MS` | Browser cookie extraction timeout in milliseconds |
@@ -393,7 +394,7 @@ Use `--no-color` to disable ANSI colour while keeping emoji. Use `--no-emoji` to
 
 - Go 1.24 or later (module currently declares `go 1.24.0`)
 - macOS or Linux
-- For browser cookie extraction: Safari (macOS Keychain), Chrome / Chromium, or Firefox must be installed and logged in to x.com
+- For browser cookie extraction: Safari, Chrome / Chromium, or Firefox must be installed and logged in to x.com
 
 ---
 

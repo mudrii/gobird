@@ -346,7 +346,7 @@ Support:
 **Platform complexity warning**: This is the highest-complexity platform-specific piece of the implementation.
 
 - **Chrome**: Cookies are stored in an SQLite database at `~/Library/Application Support/Google/Chrome/<Profile>/Cookies`. Cookie values are encrypted with AES-256-CBC using a key stored in the macOS Keychain under `Chrome Safe Storage`. You must retrieve the key via the macOS Security framework (or `security` CLI) and decrypt each value before use.
-- **Safari**: Cookies are stored in a proprietary binary format at `~/Library/Cookies/Cookies.binarycookies`. This format requires a custom parser (not SQLite).
+- **Safari**: Cookies are stored in a proprietary binary format at `~/Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies` on modern macOS. This format requires a custom parser (not SQLite).
 - **Firefox**: Cookies are stored in plain SQLite at `~/Library/Application Support/Firefox/Profiles/<profile>/cookies.sqlite`. No decryption required.
 
 Read `authentication.md` in full before implementing any browser cookie extractor.

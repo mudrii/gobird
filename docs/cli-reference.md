@@ -152,9 +152,9 @@ gobird home --cookie-source safari --cookie-source chrome
 gobird home --browser chrome --cookie-timeout 5000
 ```
 
-**Safari:** Reads from `~/Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.db`, falling back to `~/Library/Cookies/Cookies.db`.
+**Safari:** Reads from Safari's WebKit cookie store. `gobird` checks `~/Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies` first, then `~/Library/Cookies/Cookies.binarycookies`, and finally legacy `Cookies.db` locations for older Safari installs.
 
-**Chrome:** Reads from `~/Library/Application Support/Google/Chrome/<profile>/Cookies`. Cookie values are AES-128-CBC decrypted using a key retrieved from the macOS Keychain (`Chrome Safe Storage`). Also searches Chromium paths.
+**Chrome:** Reads from `~/Library/Application Support/Google/Chrome/<profile>/Cookies`. Cookie values are AES-128-CBC decrypted using a key retrieved from the macOS Keychain (`Chrome Safe Storage`). If the macOS keychain allows the `security` command in your shell but denies `gobird` as a subprocess, set `CHROME_SAFE_STORAGE_PASSWORD` to the output of `security find-generic-password -w -a Chrome -s "Chrome Safe Storage"`. Also searches Chromium paths.
 
 **Firefox:** Reads from `~/Library/Application Support/Firefox/Profiles/<profile>/cookies.sqlite`. No decryption required; Firefox stores cookies as plaintext in SQLite.
 
@@ -250,6 +250,7 @@ Environment variables override config file values when set. They are applied aft
 | `TWITTER_AUTH_TOKEN` | `authToken` | Alias for `AUTH_TOKEN` |
 | `CT0` | `ct0` | Takes precedence over `TWITTER_CT0` |
 | `TWITTER_CT0` | `ct0` | Alias for `CT0` |
+| `CHROME_SAFE_STORAGE_PASSWORD` | n/a | Optional Chrome keychain password override used only for Chrome cookie decryption |
 | `BIRD_TIMEOUT_MS` | `timeoutMs` | Integer string |
 | `BIRD_COOKIE_TIMEOUT_MS` | `cookieTimeoutMs` | Integer string |
 | `BIRD_QUOTE_DEPTH` | `quoteDepth` | Integer string |

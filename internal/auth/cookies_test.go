@@ -1,7 +1,10 @@
 package auth
 
 import (
+	"context"
 	"testing"
+
+	"github.com/mudrii/gobird/internal/types"
 )
 
 func TestPreferredDomainCookies_XComWins(t *testing.T) {
@@ -102,6 +105,22 @@ func TestPreferredDomainCookies_PartialCookies(t *testing.T) {
 }
 
 func TestExtractFromBrowserOrder_EmptyOrder(t *testing.T) {
+	prevSafari := safariExtractor
+	prevChrome := chromeExtractor
+	prevFirefox := firefoxExtractor
+	safariExtractor = func(ctx context.Context) (*types.TwitterCookies, error) { return nil, context.DeadlineExceeded }
+	chromeExtractor = func(ctx context.Context, profileHint string) (*types.TwitterCookies, error) {
+		return nil, context.DeadlineExceeded
+	}
+	firefoxExtractor = func(ctx context.Context, profileHint string) (*types.TwitterCookies, error) {
+		return nil, context.DeadlineExceeded
+	}
+	t.Cleanup(func() {
+		safariExtractor = prevSafari
+		chromeExtractor = prevChrome
+		firefoxExtractor = prevFirefox
+	})
+
 	_, err := extractFromBrowserOrder(nil, ResolveOptions{CookieTimeoutMs: 1})
 	if err == nil {
 		t.Fatal("expected error when no browser finds cookies")
