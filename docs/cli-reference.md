@@ -961,4 +961,4 @@ gobird query-ids | jq '.TweetDetail'
 | `3` | Authentication failure (HTTP 401/403, missing credentials) |
 | `4` | Rate limit (HTTP 429) |
 
-Exit code 2 is triggered by error messages containing: `unknown command`, `unknown flag`, `accepts`, `requires`, `invalid`, or `missing`.
+Exit code 2 is triggered by error messages matching specific prefixes (e.g., `unknown command`, `unknown flag`, `invalid value`, `invalid flags:`, `accepts`, `requires`).

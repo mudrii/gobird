@@ -117,7 +117,7 @@ Complete field reference with types, defaults, and corresponding environment var
 | CookieSource | `cookieSource` | `string` or `[]string` | unset | — | Ordered list of browsers to try for cookie extraction |
 | CookieTimeoutMs | `cookieTimeoutMs` | `int` | `0` | `BIRD_COOKIE_TIMEOUT_MS` | Cookie extraction timeout in milliseconds (0 = unlimited) |
 | TimeoutMs | `timeoutMs` | `int` | `0` (→ 30000) | `BIRD_TIMEOUT_MS` | HTTP request timeout in milliseconds (0 = 30000 default) |
-| QuoteDepth | `quoteDepth` | `int` | `1` | `BIRD_QUOTE_DEPTH` | Quoted tweet expansion depth |
+| QuoteDepth | `quoteDepth` | `*int` | `1` | `BIRD_QUOTE_DEPTH` | Quoted tweet expansion depth (nil = default 1, explicit 0 disables) |
 | QueryIDCachePath | `queryIdCachePath` | `string` | `""` | — | Override path for the on-disk query ID cache |
 | FeatureOverridesPath | `featureOverridesPath` | `string` | `""` | — | Path to a feature flag overrides JSON file |
 

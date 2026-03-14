@@ -82,8 +82,8 @@ The underlying protocol is Twitter/X's private GraphQL and REST v1.1 APIs. gobir
 
 ┌─────────────────────────────────────────┐
 │ internal/testutil/                      │
-│  golden.go                              │
-│  (golden-file test helpers)             │
+│  golden.go, httpmock.go                 │
+│  (golden-file + mock HTTP test helpers) │
 └─────────────────────────────────────────┘
 ```
 
@@ -163,7 +163,7 @@ API method (internal/client)
 
 Result returned to CLI
   └─ internal/output formats to terminal or JSON
-  └─ ExitCode maps error type to exit code (0/1/2)
+  └─ ExitCode maps error type to exit code (0/1/2/3/4)
 ```
 
 ---
@@ -258,7 +258,7 @@ GraphQL-level errors (200 OK with errors[] in body)
 
 Validation errors (bad credentials, bad flags)
   └─ returned synchronously from auth.ResolveCredentials or cobra PreRunE
-       └─ ExitCode maps "invalid" substring → exit code 2
+       └─ isUsageError checks error prefixes → exit code 2
 
 Partial success (some pages fetched, then error)
   └─ PaginatedResult{Items: accumulated, Success: false, Error: err}
@@ -266,8 +266,10 @@ Partial success (some pages fetched, then error)
 
 Exit codes:
   0 — success
-  1 — API error, network error, credential failure
+  1 — API error, network error
   2 — usage error (unknown flag, invalid argument, missing required value)
+  3 — auth failure (HTTP 401/403, missing credentials)
+  4 — rate limit (HTTP 429)
 ```
 
 Errors are never silently swallowed except in two documented places:

@@ -366,3 +366,290 @@ func TestExtractChrome_WithMockDB(t *testing.T) {
 		t.Fatalf("expected %q in candidates, got %v", dbPath, candidates)
 	}
 }
+
+// cbcEncrypt is a test helper that AES-CBC encrypts plaintext with PKCS#7 padding.
+func cbcEncrypt(t *testing.T, key, plaintext []byte) []byte {
+	t.Helper()
+	padLen := aes.BlockSize - (len(plaintext) % aes.BlockSize)
+	padded := make([]byte, len(plaintext)+padLen)
+	copy(padded, plaintext)
+	for i := len(plaintext); i < len(padded); i++ {
+		padded[i] = byte(padLen)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iv := []byte("                ") // 16 spaces
+	dst := make([]byte, len(padded))
+	for i := 0; i < len(padded); i += aes.BlockSize {
+		xored := make([]byte, aes.BlockSize)
+		var ivBlock []byte
+		if i == 0 {
+			ivBlock = iv
+		} else {
+			ivBlock = dst[i-aes.BlockSize : i]
+		}
+		for j := 0; j < aes.BlockSize; j++ {
+			xored[j] = padded[i+j] ^ ivBlock[j]
+		}
+		block.Encrypt(dst[i:i+aes.BlockSize], xored)
+	}
+	return dst
+}
+
+// cbcEncryptRaw is a test helper that AES-CBC encrypts pre-padded data (no auto-padding).
+func cbcEncryptRaw(t *testing.T, key, padded []byte) []byte {
+	t.Helper()
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iv := []byte("                ")
+	dst := make([]byte, len(padded))
+	for i := 0; i < len(padded); i += aes.BlockSize {
+		xored := make([]byte, aes.BlockSize)
+		var ivBlock []byte
+		if i == 0 {
+			ivBlock = iv
+		} else {
+			ivBlock = dst[i-aes.BlockSize : i]
+		}
+		for j := 0; j < aes.BlockSize; j++ {
+			xored[j] = padded[i+j] ^ ivBlock[j]
+		}
+		block.Encrypt(dst[i:i+aes.BlockSize], xored)
+	}
+	return dst
+}
+
+func TestDecryptChromeCookie_BadPaddingMiddleBytes(t *testing.T) {
+	key := chromeCookieKeyFromPassword("testpassword")
+	// Build a 32-byte block where the last byte says padding=4 but one middle
+	// padding byte is wrong. Correct PKCS#7 padding of 4 means the last 4 bytes
+	// should all be 0x04.
+	plain := make([]byte, 32)
+	copy(plain, []byte("hello world test"))     // first 16 bytes
+	copy(plain[16:], []byte("abcdefghijkl"))    // next 12 bytes of content
+	plain[28] = 0x04                             // padding byte 1 (correct)
+	plain[29] = 0x04                             // padding byte 2 (correct)
+	plain[30] = 0x07                             // padding byte 3 (WRONG — should be 0x04)
+	plain[31] = 0x04                             // last byte says pad=4
+
+	ciphertext := cbcEncryptRaw(t, key, plain)
+	enc := append([]byte("v10"), ciphertext...)
+	_, err := decryptChromeCookie(".x.com", enc, key)
+	if err == nil {
+		t.Fatal("expected error for bad padding middle byte")
+	}
+	if !strings.Contains(err.Error(), "invalid padding") {
+		t.Fatalf("expected 'invalid padding' error, got: %v", err)
+	}
+}
+
+func TestDecryptChromeCookie_V11WithHostHashPrefix(t *testing.T) {
+	key := chromeCookieKeyFromPassword("testpassword")
+	host := ".twitter.com"
+	hostHash := sha256.Sum256([]byte(host))
+	cookieVal := "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+	plaintext := append(hostHash[:], []byte(cookieVal)...)
+
+	ciphertext := cbcEncrypt(t, key, plaintext)
+	enc := append([]byte("v11"), ciphertext...)
+
+	got, err := decryptChromeCookie(host, enc, key)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != cookieVal {
+		t.Errorf("want %q, got %q", cookieVal, got)
+	}
+}
+
+func TestExtractChromeWithContext_Integration(t *testing.T) {
+	password := "integration-test-pw"
+	key := chromeCookieKeyFromPassword(password)
+
+	// Create a temp Chrome cookie DB with encrypted cookies.
+	dir := t.TempDir()
+	dbDir := filepath.Join(dir, "Library", "Application Support", "Google", "Chrome", "Default")
+	if err := os.MkdirAll(dbDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(dbDir, "Cookies")
+
+	db, err := sql.Open("sqlite", "file:"+dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`CREATE TABLE cookies (
+		host_key TEXT, name TEXT, encrypted_value BLOB
+	)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	authTokenVal := "a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0"
+	ct0Val := "abcdef1234567890abcdef1234567890ab"
+
+	encAuthToken := append([]byte("v10"), cbcEncrypt(t, key, []byte(authTokenVal))...)
+	encCt0 := append([]byte("v10"), cbcEncrypt(t, key, []byte(ct0Val))...)
+
+	_, err = db.Exec(`INSERT INTO cookies (host_key, name, encrypted_value) VALUES (?, ?, ?)`,
+		".x.com", "auth_token", encAuthToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`INSERT INTO cookies (host_key, name, encrypted_value) VALUES (?, ?, ?)`,
+		".x.com", "ct0", encCt0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Override the keychain lookup to return our test password.
+	prevLookup := chromeKeychainPasswordLookup
+	chromeKeychainPasswordLookup = func(ctx context.Context) (string, error) {
+		return password, nil
+	}
+	t.Cleanup(func() {
+		chromeKeychainPasswordLookup = prevLookup
+	})
+
+	// Override UserHomeDir by using the env-based password and profile hint
+	// pointing directly to the DB file.
+	t.Setenv(chromeSafeStoragePasswordEnv, password)
+	result, err := extractChromeWithContext(context.Background(), dbPath)
+	if err != nil {
+		t.Fatalf("extractChromeWithContext: %v", err)
+	}
+	if result.AuthToken != authTokenVal {
+		t.Errorf("auth_token: want %q, got %q", authTokenVal, result.AuthToken)
+	}
+	if result.Ct0 != ct0Val {
+		t.Errorf("ct0: want %q, got %q", ct0Val, result.Ct0)
+	}
+	wantHeader := "auth_token=" + authTokenVal + "; ct0=" + ct0Val
+	if result.CookieHeader != wantHeader {
+		t.Errorf("cookie header: want %q, got %q", wantHeader, result.CookieHeader)
+	}
+}
+
+func TestExtractChromeWithContext_CancelledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	_, err := extractChromeWithContext(ctx, "")
+	if err == nil {
+		t.Fatal("expected error for cancelled context")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got: %v", err)
+	}
+}
+
+func TestExtractChromeWithContext_MissingCookies(t *testing.T) {
+	password := "test-missing"
+	key := chromeCookieKeyFromPassword(password)
+
+	dir := t.TempDir()
+	dbDir := filepath.Join(dir, "Library", "Application Support", "Google", "Chrome", "Default")
+	if err := os.MkdirAll(dbDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(dbDir, "Cookies")
+
+	db, err := sql.Open("sqlite", "file:"+dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`CREATE TABLE cookies (
+		host_key TEXT, name TEXT, encrypted_value BLOB
+	)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only insert auth_token, not ct0 — should fail.
+	authTokenVal := "a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0"
+	encAuthToken := append([]byte("v10"), cbcEncrypt(t, key, []byte(authTokenVal))...)
+	_, err = db.Exec(`INSERT INTO cookies (host_key, name, encrypted_value) VALUES (?, ?, ?)`,
+		".x.com", "auth_token", encAuthToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv(chromeSafeStoragePasswordEnv, password)
+	_, err = extractChromeWithContext(context.Background(), dbPath)
+	if err == nil {
+		t.Fatal("expected error when ct0 cookie is missing")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("expected 'not found' in error, got: %v", err)
+	}
+}
+
+func TestExtractChromeWithContext_V11EncryptedWithHostHash(t *testing.T) {
+	password := "v11-hosthash-pw"
+	key := chromeCookieKeyFromPassword(password)
+
+	dir := t.TempDir()
+	dbDir := filepath.Join(dir, "Library", "Application Support", "Google", "Chrome", "Default")
+	if err := os.MkdirAll(dbDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(dbDir, "Cookies")
+
+	db, err := sql.Open("sqlite", "file:"+dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`CREATE TABLE cookies (
+		host_key TEXT, name TEXT, encrypted_value BLOB
+	)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	host := ".x.com"
+	hostHash := sha256.Sum256([]byte(host))
+	authTokenVal := "f1e2d3c4b5a6f1e2d3c4b5a6f1e2d3c4b5a6f1e2"
+	ct0Val := "0123456789abcdef0123456789abcdef01"
+
+	// v11 prefix + host-hash prepended to plaintext
+	authPlain := append(hostHash[:], []byte(authTokenVal)...)
+	ct0Plain := append(hostHash[:], []byte(ct0Val)...)
+
+	encAuth := append([]byte("v11"), cbcEncrypt(t, key, authPlain)...)
+	encCt0 := append([]byte("v11"), cbcEncrypt(t, key, ct0Plain)...)
+
+	_, err = db.Exec(`INSERT INTO cookies (host_key, name, encrypted_value) VALUES (?, ?, ?)`,
+		host, "auth_token", encAuth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`INSERT INTO cookies (host_key, name, encrypted_value) VALUES (?, ?, ?)`,
+		host, "ct0", encCt0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv(chromeSafeStoragePasswordEnv, password)
+	result, err := extractChromeWithContext(context.Background(), dbPath)
+	if err != nil {
+		t.Fatalf("extractChromeWithContext: %v", err)
+	}
+	if result.AuthToken != authTokenVal {
+		t.Errorf("auth_token: want %q, got %q", authTokenVal, result.AuthToken)
+	}
+	if result.Ct0 != ct0Val {
+		t.Errorf("ct0: want %q, got %q", ct0Val, result.Ct0)
+	}
+}

@@ -287,8 +287,8 @@ func TestPipeline_ConfigLoading(t *testing.T) {
 	if cfg.TimeoutMs != 5000 {
 		t.Errorf("TimeoutMs: want 5000, got %d", cfg.TimeoutMs)
 	}
-	if cfg.QuoteDepth != 2 {
-		t.Errorf("QuoteDepth: want 2, got %d", cfg.QuoteDepth)
+	if cfg.QuoteDepth == nil || *cfg.QuoteDepth != 2 {
+		t.Errorf("QuoteDepth: want 2, got %v", cfg.QuoteDepth)
 	}
 
 	c := client.New(cfg.AuthToken, cfg.Ct0, &client.Options{
@@ -320,8 +320,8 @@ func TestPipeline_ConfigLoading_MinimalDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.QuoteDepth != 1 {
-		t.Errorf("QuoteDepth default: want 1, got %d", cfg.QuoteDepth)
+	if cfg.QuoteDepth == nil || *cfg.QuoteDepth != 1 {
+		t.Errorf("QuoteDepth default: want 1, got %v", cfg.QuoteDepth)
 	}
 }
 
