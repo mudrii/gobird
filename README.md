@@ -6,6 +6,8 @@
 
 gobird is a Twitter/X CLI tool and Go client library.
 
+This project uses X/Twitter's unofficial private web APIs. It is intended for personal, research, and automation use, and upstream changes can break behavior without notice.
+
 ---
 
 ## Features
@@ -31,6 +33,20 @@ gobird is a Twitter/X CLI tool and Go client library.
 
 ## Installation
 
+### Release binaries
+
+Prebuilt binaries are published on the GitHub Releases page for supported platforms.
+
+1. Download the archive for your platform from `https://github.com/mudrii/gobird/releases`
+2. Extract it
+3. Move `gobird` into a directory on your `PATH`, for example:
+
+```sh
+tar -xzf gobird_26.03.15_darwin_arm64.tar.gz
+install gobird /usr/local/bin/gobird
+gobird --version
+```
+
 ### go install
 
 ```sh
@@ -46,6 +62,57 @@ git clone https://github.com/mudrii/gobird.git
 cd gobird
 make build
 # binary at bin/gobird
+```
+
+### Post-install configuration
+
+`gobird` works without a config file if you pass credentials with flags, environment variables, or browser extraction. For a persistent setup, create a JSON5 config file at one of these locations:
+
+- `~/.config/gobird/config.json5`
+- `~/.gobirdrc.json5`
+
+Minimal example:
+
+```json5
+{
+  authToken: "your-auth-token",
+  ct0: "your-ct0-token",
+  browser: "safari",
+  output: "human"
+}
+```
+
+First-run checks:
+
+```sh
+gobird --version
+gobird check --browser safari
+gobird whoami
+```
+
+For all config keys and browser-specific options, see [docs/configuration.md](docs/configuration.md).
+
+### Updating
+
+If you installed with release binaries, download the new archive for the next release, replace the existing `gobird` binary, and run:
+
+```sh
+gobird --version
+```
+
+If you installed with `go install`, update with:
+
+```sh
+go install github.com/mudrii/gobird/cmd/gobird@latest
+gobird --version
+```
+
+If you built from source, update by pulling the latest changes and rebuilding:
+
+```sh
+git pull --ff-only
+make build
+./bin/gobird --version
 ```
 
 ---
@@ -433,6 +500,16 @@ Install `golangci-lint`:
 brew install golangci-lint          # macOS
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 ```
+
+---
+
+## Open source project docs
+
+- [LICENSE](LICENSE)
+- [CHANGELOG](CHANGELOG.md)
+- [CONTRIBUTING](CONTRIBUTING.md)
+- [CODE OF CONDUCT](CODE_OF_CONDUCT.md)
+- [SECURITY](SECURITY.md)
 
 ---
 

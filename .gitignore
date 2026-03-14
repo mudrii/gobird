@@ -3,3 +3,6 @@ coverage.out
 coverage.html
 /gobird
 /bird
+.tmp-go-cache/
+.tmp-go-modcache/
+dist/
