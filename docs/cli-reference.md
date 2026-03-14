@@ -64,7 +64,7 @@ The Makefile injects version and git SHA at link time:
 ```sh
 make build   # produces bin/gobird with version + SHA
 make test    # run all tests
-make ci      # vet + test + test-race + build
+make ci      # fmt-check + vet + test + test-race + lint + build
 ```
 
 ---
@@ -947,6 +947,7 @@ gobird query-ids | jq '.TweetDetail'
 | `BIRD_QUOTE_DEPTH` | Quoted tweet expansion depth |
 | `BIRD_FEATURES_JSON` | Inline JSON string to override GraphQL feature flags |
 | `BIRD_FEATURES_PATH` | Path to a JSON file containing feature flag overrides |
+| `CHROME_SAFE_STORAGE_PASSWORD` | Chrome Safe Storage password for cookie decryption (bypasses Keychain lookup) |
 
 ---
 
@@ -955,7 +956,9 @@ gobird query-ids | jq '.TweetDetail'
 | Code | Meaning |
 |------|---------|
 | `0` | Success |
-| `1` | Runtime error (API failure, auth error, network error) |
+| `1` | Runtime error (API failure, network error) |
 | `2` | Usage error (unknown command, unknown flag, invalid argument) |
+| `3` | Authentication failure (HTTP 401/403, missing credentials) |
+| `4` | Rate limit (HTTP 429) |
 
 Exit code 2 is triggered by error messages containing: `unknown command`, `unknown flag`, `accepts`, `requires`, `invalid`, or `missing`.

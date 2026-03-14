@@ -161,8 +161,8 @@ func TestLoad_DefaultsApplied(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.QuoteDepth != 1 {
-		t.Errorf("QuoteDepth default: want 1, got %d", cfg.QuoteDepth)
+	if cfg.QuoteDepth == nil || *cfg.QuoteDepth != 1 {
+		t.Errorf("QuoteDepth default: want 1, got %v", cfg.QuoteDepth)
 	}
 }
 
@@ -239,8 +239,8 @@ func TestLoad_EnvOverrides(t *testing.T) {
 	if cfg.CookieTimeoutMs != 6000 {
 		t.Errorf("CookieTimeoutMs: want 6000, got %d", cfg.CookieTimeoutMs)
 	}
-	if cfg.QuoteDepth != 7 {
-		t.Errorf("QuoteDepth: want 7, got %d", cfg.QuoteDepth)
+	if cfg.QuoteDepth == nil || *cfg.QuoteDepth != 7 {
+		t.Errorf("QuoteDepth: want 7, got %v", cfg.QuoteDepth)
 	}
 }
 
@@ -271,8 +271,8 @@ func TestLoad_EmptyWhenNoFileFound(t *testing.T) {
 		t.Fatalf("Load with no file: unexpected error: %v", err)
 	}
 	// QuoteDepth default should be applied even if no file was loaded.
-	if cfg.QuoteDepth != 1 {
-		t.Errorf("QuoteDepth: want default 1, got %d", cfg.QuoteDepth)
+	if cfg.QuoteDepth == nil || *cfg.QuoteDepth != 1 {
+		t.Errorf("QuoteDepth: want default 1, got %v", cfg.QuoteDepth)
 	}
 }
 

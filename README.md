@@ -283,11 +283,12 @@ Methods that follow this pattern: `Search`, `GetAllSearchResults`, `GetHomeTimel
 
 ## Configuration
 
-Config is loaded from the following locations, in order (later entries override earlier ones):
+Config is loaded from the following locations:
 
-1. `~/.config/gobird/config.json5` — global
-2. `./.gobirdrc.json5` — project-local
-3. Path from `$BIRD_CONFIG` env var or `--config` flag — explicit override
+- When `$BIRD_CONFIG` or `--config` is set: **only** that file is loaded (replaces default search)
+- Otherwise, in order (later entries override earlier ones):
+  1. `~/.config/gobird/config.json5` — global
+  2. `./.gobirdrc.json5` — project-local
 
 Config files use [JSON5](https://json5.org/) syntax (comments and trailing commas are allowed).
 
@@ -410,7 +411,7 @@ make test
 # Run tests with race detector
 make test-race
 
-# Run vet, tests, and race-detector in one step (mirrors CI)
+# Run fmt-check, vet, tests, race-detector, lint, and build (mirrors CI)
 make ci
 
 # Run linter (requires golangci-lint)

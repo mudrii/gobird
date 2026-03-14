@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - **Go**: 1.24 or later (see `go.mod`)
-- **golangci-lint**: for linting (`go install github.com/golangci-lint/golangci-lint/cmd/golangci-lint@latest` or via Homebrew)
+- **golangci-lint**: for linting (`go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest` or via Homebrew)
 - **git**: for version injection into the binary
 - **macOS**: required for browser cookie extraction features (Chrome AES-CBC decryption via Keychain, Safari's WebKit cookie store, Firefox SQLite stores)
 
@@ -23,7 +23,6 @@ gobird/
 │   ├── config/           # JSON5 config file loading, env var overlay
 │   ├── output/           # terminal formatting (color, emoji, JSON, plain text)
 │   ├── parsing/          # GraphQL response parsing — cursors, tweets, users, news
-│   ├── runtime/          # runtime support (feature override env vars)
 │   ├── testutil/         # shared test helpers (mock HTTP server, golden files)
 │   └── types/            # all shared types: wire types, models, options, results
 ├── pkg/bird/             # public Go API — thin wrapper around internal/client
@@ -104,7 +103,7 @@ make vet         # runs go vet ./...
 make fmt         # runs gofmt -w .
 ```
 
-The `.golangci.yml` enables `errcheck`, `errorlint`, `gosec`, `govet`, `ineffassign`, `nilerr`, `staticcheck`, `unused`, `unparam`, and `revive`. The `revive` `exported` rule is configured with `disableStutteringCheck`. Test files are exempted from `revive`.
+The `.golangci.yml` enables `errcheck`, `errorlint`, `gosec`, `govet`, `ineffassign`, `nilerr`, `staticcheck`, `unused`, `unparam`, and `revive`. The `revive` `exported` rule is configured with `disableStutteringCheck`. Test files are exempted from `errcheck`, `gosec`, and `revive`.
 
 ---
 

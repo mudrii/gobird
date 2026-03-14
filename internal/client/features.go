@@ -31,7 +31,10 @@ func loadFeatureOverrides() featureOverrideConfig {
 		if inline := os.Getenv("BIRD_FEATURES_JSON"); inline != "" {
 			payload = []byte(inline)
 		} else if path := os.Getenv("BIRD_FEATURES_PATH"); path != "" {
-			if b, err := os.ReadFile(path); err == nil {
+			b, err := os.ReadFile(path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: failed to read feature overrides from %s: %v\n", path, err)
+			} else {
 				payload = b
 			}
 		}

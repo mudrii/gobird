@@ -60,7 +60,8 @@ type Config struct {
 	// TimeoutMs controls HTTP request timeout.
 	TimeoutMs int `json:"timeoutMs"`
 	// QuoteDepth controls quoted tweet expansion depth.
-	QuoteDepth int `json:"quoteDepth"`
+	// Uses pointer to distinguish "not set" (nil) from "explicitly 0".
+	QuoteDepth *int `json:"quoteDepth"`
 	// QueryIDCachePath overrides the default query ID cache file location.
 	QueryIDCachePath string `json:"queryIdCachePath"`
 	// FeatureOverridesPath overrides the default features JSON path.
@@ -144,8 +145,9 @@ func loadFile(path string, cfg *Config) error {
 
 // applyDefaults sets zero-value fields to their documented defaults.
 func applyDefaults(cfg *Config) {
-	if cfg.QuoteDepth == 0 {
-		cfg.QuoteDepth = 1
+	if cfg.QuoteDepth == nil {
+		one := 1
+		cfg.QuoteDepth = &one
 	}
 }
 
@@ -183,7 +185,7 @@ func applyEnv(cfg *Config) error {
 		if err != nil {
 			return fmt.Errorf("invalid value for BIRD_QUOTE_DEPTH: %q; expected integer", v)
 		}
-		cfg.QuoteDepth = n
+		cfg.QuoteDepth = &n
 	}
 	return nil
 }

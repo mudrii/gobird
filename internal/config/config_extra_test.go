@@ -62,8 +62,8 @@ func TestLoad_MissingFieldsGetDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.QuoteDepth != 1 {
-		t.Errorf("QuoteDepth: want default 1, got %d", cfg.QuoteDepth)
+	if cfg.QuoteDepth == nil || *cfg.QuoteDepth != 1 {
+		t.Errorf("QuoteDepth: want default 1, got %v", cfg.QuoteDepth)
 	}
 	if cfg.TimeoutMs != 0 {
 		t.Errorf("TimeoutMs: want 0, got %d", cfg.TimeoutMs)
@@ -130,8 +130,8 @@ func TestLoad_AllFields(t *testing.T) {
 	if cfg.TimeoutMs != 10000 {
 		t.Errorf("TimeoutMs: want 10000, got %d", cfg.TimeoutMs)
 	}
-	if cfg.QuoteDepth != 3 {
-		t.Errorf("QuoteDepth: want 3, got %d", cfg.QuoteDepth)
+	if cfg.QuoteDepth == nil || *cfg.QuoteDepth != 3 {
+		t.Errorf("QuoteDepth: want 3, got %v", cfg.QuoteDepth)
 	}
 	if cfg.QueryIDCachePath != "/tmp/ids.json" {
 		t.Errorf("QueryIDCachePath: want %q, got %q", "/tmp/ids.json", cfg.QueryIDCachePath)
@@ -232,9 +232,9 @@ func TestLoad_QuoteDepthExplicitZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	// quoteDepth=0 in file triggers applyDefaults which sets it to 1
-	if cfg.QuoteDepth != 1 {
-		t.Errorf("QuoteDepth: zero should default to 1, got %d", cfg.QuoteDepth)
+	// quoteDepth=0 in file should now be preserved (pointer distinguishes nil from 0)
+	if cfg.QuoteDepth == nil || *cfg.QuoteDepth != 0 {
+		t.Errorf("QuoteDepth: explicit zero should be preserved, got %v", cfg.QuoteDepth)
 	}
 }
 
@@ -254,8 +254,8 @@ func TestLoad_QuoteDepthEnvOverridesDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.QuoteDepth != 0 {
-		t.Errorf("QuoteDepth: env=0 should override default, got %d", cfg.QuoteDepth)
+	if cfg.QuoteDepth == nil || *cfg.QuoteDepth != 0 {
+		t.Errorf("QuoteDepth: env=0 should override default, got %v", cfg.QuoteDepth)
 	}
 }
 

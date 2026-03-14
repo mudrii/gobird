@@ -88,7 +88,7 @@ func TestResolveQuoteDepth_Default(t *testing.T) {
 	globalFlags.quoteDepth = -1
 	defer func() { globalFlags.quoteDepth = old }()
 
-	cfg := &config.Config{QuoteDepth: -1}
+	cfg := &config.Config{}
 	got := resolveQuoteDepth(cfg)
 	if got != 1 {
 		t.Errorf("resolveQuoteDepth default = %d, want 1", got)

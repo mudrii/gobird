@@ -138,8 +138,8 @@ func parseSafariBinaryCookies(ctx context.Context, data []byte) ([]domainCookie,
 	}
 
 	pageCount := int(binary.BigEndian.Uint32(data[4:8]))
-	if pageCount < 0 {
-		return nil, fmt.Errorf("invalid page count")
+	if pageCount == 0 {
+		return nil, nil
 	}
 	headerSize := 8 + pageCount*4
 	if len(data) < headerSize {
@@ -153,7 +153,7 @@ func parseSafariBinaryCookies(ctx context.Context, data []byte) ([]domainCookie,
 			return nil, err
 		}
 		pageSize := int(binary.BigEndian.Uint32(data[8+i*4 : 12+i*4]))
-		if pageSize <= 0 {
+		if pageSize == 0 {
 			return nil, fmt.Errorf("invalid page size")
 		}
 		if offset+pageSize > len(data) {

@@ -94,14 +94,15 @@ The underlying protocol is Twitter/X's private GraphQL and REST v1.1 APIs. gobir
 The codebase follows a strict layered dependency graph with no upward imports:
 
 ```
-cmd  →  internal/cli  →  pkg/bird  →  internal/client  →  internal/parsing  →  internal/types
-                    ↘                ↗
+cmd  →  internal/cli  →  internal/client  →  internal/parsing  →  internal/types
+                    ↘       ↗
                   internal/auth
                   internal/config
                   internal/output
+                  pkg/bird (error sentinels only)
 ```
 
-Each layer may only import layers below it. `internal/types` has no internal imports. `internal/parsing` imports only `internal/types`. `internal/client` imports `internal/parsing` and `internal/types`. `pkg/bird` wraps `internal/client` and re-exports `internal/types` and `internal/auth`. `internal/cli` uses `pkg/bird` exclusively for API calls.
+Each layer may only import layers below it. `internal/types` has no internal imports. `internal/parsing` imports only `internal/types`. `internal/client` imports `internal/parsing` and `internal/types`. `pkg/bird` wraps `internal/client` and re-exports `internal/types` and `internal/auth`. `internal/cli` imports `internal/client` directly for API calls and uses `pkg/bird` for error sentinels in exit code mapping.
 
 ---
 

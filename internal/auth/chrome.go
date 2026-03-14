@@ -193,10 +193,15 @@ func decryptChromeCookie(host string, enc []byte, key []byte) (string, error) {
 	mode := cipher.NewCBCDecrypter(block, iv)
 	dst := make([]byte, len(enc))
 	mode.CryptBlocks(dst, enc)
-	// Strip PKCS#7 padding.
+	// Strip PKCS#7 padding — verify all padding bytes match.
 	pad := int(dst[len(dst)-1])
 	if pad == 0 || pad > aes.BlockSize || pad > len(dst) {
 		return "", fmt.Errorf("invalid padding")
+	}
+	for i := 0; i < pad; i++ {
+		if dst[len(dst)-1-i] != byte(pad) {
+			return "", fmt.Errorf("invalid padding")
+		}
 	}
 	plaintext := dst[:len(dst)-pad]
 	if len(plaintext) >= sha256.Size {

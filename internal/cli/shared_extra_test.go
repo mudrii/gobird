@@ -155,7 +155,8 @@ func TestResolveQuoteDepth_ConfigFallback(t *testing.T) {
 	defer func() { globalFlags.quoteDepth = old }()
 
 	globalFlags.quoteDepth = -1
-	cfg := &config.Config{QuoteDepth: 5}
+	five := 5
+	cfg := &config.Config{QuoteDepth: &five}
 	got := resolveQuoteDepth(cfg)
 	if got != 5 {
 		t.Errorf("resolveQuoteDepth: want 5, got %d", got)
@@ -167,7 +168,8 @@ func TestResolveQuoteDepth_FlagZero(t *testing.T) {
 	defer func() { globalFlags.quoteDepth = old }()
 
 	globalFlags.quoteDepth = 0
-	cfg := &config.Config{QuoteDepth: 5}
+	five := 5
+	cfg := &config.Config{QuoteDepth: &five}
 	got := resolveQuoteDepth(cfg)
 	if got != 0 {
 		t.Errorf("resolveQuoteDepth: want 0, got %d", got)

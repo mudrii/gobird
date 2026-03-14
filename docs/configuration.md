@@ -237,7 +237,7 @@ How many levels deep to recursively fetch quoted tweets. The default after apply
 
 | Value | Effect |
 |-------|--------|
-| `0` | No quoted tweet expansion |
+| `0` | No quoted tweet expansion (must be set explicitly; omitting defaults to 1) |
 | `1` | Expand one level of quoted tweets (default) |
 | `2+` | Expand recursively to that depth |
 
@@ -268,7 +268,7 @@ Environment variables are applied after config files are loaded and always win o
 | `CT0` | string | `ct0` | Takes precedence over `TWITTER_CT0` |
 | `TWITTER_CT0` | string | `ct0` | Alias; only used if `CT0` is not set |
 | `BIRD_CONFIG` | string | (config path) | Selects a specific config file, bypassing default search |
-| `BIRD_TIMEOUT_MS` | int string | `timeoutMs` | Parsed with `strconv.Atoi`; invalid values are ignored |
+| `BIRD_TIMEOUT_MS` | int string | `timeoutMs` | Parsed with `strconv.Atoi`; invalid values return an error |
 | `BIRD_COOKIE_TIMEOUT_MS` | int string | `cookieTimeoutMs` | Parsed with `strconv.Atoi` |
 | `BIRD_QUOTE_DEPTH` | int string | `quoteDepth` | Parsed with `strconv.Atoi` |
 | `BIRD_FEATURES_JSON` | JSON string | (feature overrides) | Inline feature override JSON (see Feature Flags section) |
@@ -511,7 +511,7 @@ Controls how long a single HTTP request can take before being aborted.
 - **Env var:** `BIRD_TIMEOUT_MS`
 - **Flag:** `--timeout <ms>`
 
-Flag takes precedence over config, which takes precedence over env var.
+Flag takes precedence over env var, which takes precedence over config file.
 
 ### Cookie extraction timeout
 

@@ -54,12 +54,14 @@ func extractFirefoxWithContext(ctx context.Context, profileHint string) (result 
 	}
 
 	var cookies []domainCookie
+	var lastDBErr error
 	for _, dbPath := range dbPaths {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
 		c, err := readFirefoxCookiesWithContext(ctx, dbPath)
 		if err != nil {
+			lastDBErr = err
 			continue
 		}
 		cookies = append(cookies, c...)
@@ -67,6 +69,9 @@ func extractFirefoxWithContext(ctx context.Context, profileHint string) (result 
 
 	authToken, ct0 := preferredDomainCookies(cookies)
 	if authToken == "" || ct0 == "" {
+		if lastDBErr != nil {
+			return nil, fmt.Errorf("firefox: auth_token or ct0 not found: %w", lastDBErr)
+		}
 		return nil, fmt.Errorf("firefox: auth_token or ct0 not found")
 	}
 	result = &types.TwitterCookies{
@@ -111,5 +116,8 @@ func readFirefoxCookiesWithContext(ctx context.Context, dbPath string) (result [
 		}
 		result = append(result, c)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("firefox: iterate cookies: %w", err)
+	}
+	return result, nil
 }

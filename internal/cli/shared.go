@@ -104,8 +104,8 @@ func resolveQuoteDepth(cfg *config.Config) int {
 	if globalFlags.quoteDepth >= 0 {
 		return globalFlags.quoteDepth
 	}
-	if cfg.QuoteDepth >= 0 {
-		return cfg.QuoteDepth
+	if cfg.QuoteDepth != nil {
+		return *cfg.QuoteDepth
 	}
 	return 1
 }
