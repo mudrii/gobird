@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -13,7 +14,14 @@ import (
 )
 
 // extractFirefox reads cookies from Firefox's plain SQLite cookie store.
-func extractFirefox(profileHint string) (*types.TwitterCookies, error) {
+func extractFirefox(profileHint string) (result *types.TwitterCookies, err error) {
+	return extractFirefoxWithContext(context.Background(), profileHint)
+}
+
+func extractFirefoxWithContext(ctx context.Context, profileHint string) (result *types.TwitterCookies, err error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("firefox: home directory: %w", err)
@@ -47,7 +55,10 @@ func extractFirefox(profileHint string) (*types.TwitterCookies, error) {
 
 	var cookies []domainCookie
 	for _, dbPath := range dbPaths {
-		c, err := readFirefoxCookies(dbPath)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		c, err := readFirefoxCookiesWithContext(ctx, dbPath)
 		if err != nil {
 			continue
 		}
@@ -58,29 +69,41 @@ func extractFirefox(profileHint string) (*types.TwitterCookies, error) {
 	if authToken == "" || ct0 == "" {
 		return nil, fmt.Errorf("firefox: auth_token or ct0 not found")
 	}
-	return &types.TwitterCookies{
+	result = &types.TwitterCookies{
 		AuthToken:    authToken,
 		Ct0:          ct0,
 		CookieHeader: buildCookieHeader(authToken, ct0),
-	}, nil
+	}
+	return result, nil
 }
 
-func readFirefoxCookies(dbPath string) ([]domainCookie, error) {
+func readFirefoxCookies(dbPath string) (result []domainCookie, err error) {
+	return readFirefoxCookiesWithContext(context.Background(), dbPath)
+}
+
+func readFirefoxCookiesWithContext(ctx context.Context, dbPath string) (result []domainCookie, err error) {
 	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro&immutable=1")
 	if err != nil {
 		return nil, fmt.Errorf("firefox: open cookie database: %w", err)
 	}
-	defer db.Close() //nolint:errcheck
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("firefox: close cookie database: %w", closeErr)
+		}
+	}()
 
-	rows, err := db.Query(
+	rows, err := db.QueryContext(ctx,
 		`SELECT host, name, value FROM moz_cookies WHERE name IN ('auth_token','ct0') AND (host LIKE '%x.com' OR host LIKE '%twitter.com')`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("firefox: query cookies: %w", err)
 	}
-	defer rows.Close() //nolint:errcheck
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("firefox: close cookies query: %w", closeErr)
+		}
+	}()
 
-	var result []domainCookie
 	for rows.Next() {
 		var c domainCookie
 		if err := rows.Scan(&c.domain, &c.name, &c.value); err != nil {

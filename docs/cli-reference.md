@@ -1,6 +1,6 @@
 # gobird CLI Reference
 
-`bird` is the command-line interface for gobird, a Twitter/X client written in Go. It supports reading tweets, posting, searching, managing bookmarks, following/unfollowing users, and more — all authenticated via browser cookies or explicit token values.
+`gobird` is the command-line interface for gobird, a Twitter/X client written in Go. It supports reading tweets, posting, searching, managing bookmarks, following/unfollowing users, and more — all authenticated via browser cookies or explicit token values.
 
 ## Table of Contents
 
@@ -48,7 +48,7 @@
 go install github.com/mudrii/gobird/cmd/gobird@latest
 ```
 
-The installed binary is named `gobird`, but the CLI command is `bird` when invoked directly from a built binary.
+The installed binary is named `gobird`, but the CLI command is `gobird` when invoked directly from a built binary.
 
 ### Build from source
 
@@ -112,7 +112,7 @@ The CLI resolves credentials in the following priority order:
 Both `--auth-token` and `--ct0` must be provided together. If only one is given, this tier is skipped.
 
 ```sh
-bird read 1234567890 \
+gobird read 1234567890 \
   --auth-token a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2 \
   --ct0 abc123def456abc123def456abc123def456abc123
 ```
@@ -124,7 +124,7 @@ Set both `AUTH_TOKEN` and `CT0` (preferred names), or their aliases `TWITTER_AUT
 ```sh
 export AUTH_TOKEN=a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
 export CT0=abc123def456abc123def456abc123def456abc123
-bird home
+gobird home
 ```
 
 Alias resolution order:
@@ -137,19 +137,19 @@ When no explicit tokens are provided, cookies are read directly from an installe
 
 ```sh
 # Use Safari (macOS only)
-bird home --browser safari
+gobird home --browser safari
 
 # Use Chrome with a specific profile
-bird home --browser chrome --chrome-profile "Profile 1"
+gobird home --browser chrome --chrome-profile "Profile 1"
 
 # Use Firefox with a profile name hint
-bird home --browser firefox --firefox-profile myprofile
+gobird home --browser firefox --firefox-profile myprofile
 
 # Try browsers in a custom order
-bird home --cookie-source safari --cookie-source chrome
+gobird home --cookie-source safari --cookie-source chrome
 
 # Set a timeout to avoid hanging on slow keychain access
-bird home --browser chrome --cookie-timeout 5000
+gobird home --browser chrome --cookie-timeout 5000
 ```
 
 **Safari:** Reads from `~/Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.db`, falling back to `~/Library/Cookies/Cookies.db`.
@@ -170,19 +170,19 @@ The config file uses [JSON5](https://json5.org/) syntax (comments and trailing c
 
 Config files are loaded and merged in this order (later values override earlier ones):
 
-1. `~/.config/bird/config.json5` — global user config
-2. `./.birdrc.json5` — project-local config (current working directory)
+1. `~/.config/gobird/config.json5` — global user config
+2. `./.gobirdrc.json5` — project-local config (current working directory)
 
 A single explicit path bypasses the search order entirely:
 
 ```sh
-bird --config /path/to/myconfig.json5 home
+gobird --config /path/to/myconfig.json5 home
 ```
 
 The environment variable `BIRD_CONFIG` also selects an explicit path:
 
 ```sh
-BIRD_CONFIG=/path/to/myconfig.json5 bird home
+BIRD_CONFIG=/path/to/myconfig.json5 gobird home
 ```
 
 ### All config fields
@@ -204,8 +204,8 @@ BIRD_CONFIG=/path/to/myconfig.json5 bird home
   "firefoxProfile": "",     // string: Firefox profile name or substring hint
 
   // Cookie source order for browser extraction.
-  // Accepts a single string or an array of strings.
-  "cookieSource": [],       // string | string[]: ["safari", "chrome", "firefox"]
+  // Accepts a single string or a non-empty array of strings.
+  "cookieSource": ["safari", "chrome"], // string | string[]
 
   // Timeouts.
   "cookieTimeoutMs": 0,     // int: browser cookie extraction timeout in ms (0 = unlimited)
@@ -302,16 +302,16 @@ Print the build version and git SHA.
 
 **Syntax:**
 ```
-bird version
-bird --version
+gobird version
+gobird --version
 ```
 
 **Examples:**
 ```sh
-bird version
+gobird version
 # v1.2.3 (abc1234)
 
-bird --version
+gobird --version
 # dev (unknown)
 ```
 
@@ -323,8 +323,8 @@ Read a single tweet by ID or URL.
 
 **Syntax:**
 ```
-bird read <tweet-id-or-url>
-bird <tweet-id-or-url>
+gobird read <tweet-id-or-url>
+gobird <tweet-id-or-url>
 ```
 
 The root command also accepts a single bare argument and delegates to `read`.
@@ -333,10 +333,10 @@ The root command also accepts a single bare argument and delegates to `read`.
 
 **Examples:**
 ```sh
-bird read 1234567890123456789
-bird read https://x.com/user/status/1234567890123456789
-bird 1234567890123456789 --json
-bird read 1234567890123456789 --json-full --quote-depth 2
+gobird read 1234567890123456789
+gobird read https://x.com/user/status/1234567890123456789
+gobird 1234567890123456789 --json
+gobird read 1234567890123456789 --json-full --quote-depth 2
 ```
 
 **Exit codes:** 0 success, 1 API/auth error, 2 invalid argument.
@@ -349,7 +349,7 @@ Fetch replies to a tweet.
 
 **Syntax:**
 ```
-bird replies <tweet-id-or-url>
+gobird replies <tweet-id-or-url>
 ```
 
 **Description:** Returns all reply tweets to the specified tweet. Paginated; respects `--count` and `--max-pages`.
@@ -358,8 +358,8 @@ bird replies <tweet-id-or-url>
 
 **Examples:**
 ```sh
-bird replies 1234567890123456789
-bird replies https://x.com/user/status/1234567890 --count 20 --json
+gobird replies 1234567890123456789
+gobird replies https://x.com/user/status/1234567890 --count 20 --json
 ```
 
 ---
@@ -370,7 +370,7 @@ Fetch a tweet thread.
 
 **Syntax:**
 ```
-bird thread <tweet-id-or-url> [--filter author|full]
+gobird thread <tweet-id-or-url> [--filter author|full]
 ```
 
 **Description:** Fetches all tweets in a thread starting from the given tweet. Two filter modes control which replies to include:
@@ -388,9 +388,9 @@ bird thread <tweet-id-or-url> [--filter author|full]
 
 **Examples:**
 ```sh
-bird thread 1234567890123456789
-bird thread 1234567890123456789 --filter full
-bird thread https://x.com/user/status/1234567890 --json --count 50
+gobird thread 1234567890123456789
+gobird thread 1234567890123456789 --filter full
+gobird thread https://x.com/user/status/1234567890 --json --count 50
 ```
 
 ---
@@ -401,7 +401,7 @@ Post a new tweet.
 
 **Syntax:**
 ```
-bird tweet <text>
+gobird tweet <text>
 ```
 
 **Description:** Posts a new tweet with the given text. Returns the new tweet ID on success (as plain text, or `{"id":"..."}` with `--json`).
@@ -410,12 +410,12 @@ Media attachments: use `--media` to attach up to 4 files. Each `--media` may hav
 
 **Examples:**
 ```sh
-bird tweet "Hello, world!"
-bird tweet "Check this out" --media /path/to/image.png --alt "A screenshot"
-bird tweet "Photo dump" \
+gobird tweet "Hello, world!"
+gobird tweet "Check this out" --media /path/to/image.png --alt "A screenshot"
+gobird tweet "Photo dump" \
   --media /path/to/a.jpg --alt "First photo" \
   --media /path/to/b.jpg --alt "Second photo"
-bird tweet "Silent post" --json
+gobird tweet "Silent post" --json
 ```
 
 **Output:**
@@ -430,16 +430,16 @@ Reply to a tweet.
 
 **Syntax:**
 ```
-bird reply <tweet-id-or-url> <text>
+gobird reply <tweet-id-or-url> <text>
 ```
 
 **Description:** Posts a reply to the specified tweet. Accepts the same `--media` and `--alt` flags as `tweet`. Returns the new tweet ID.
 
 **Examples:**
 ```sh
-bird reply 1234567890123456789 "Great point!"
-bird reply https://x.com/user/status/1234567890 "Agreed" --media /path/to/img.png
-bird reply 1234567890 "This" --json
+gobird reply 1234567890123456789 "Great point!"
+gobird reply https://x.com/user/status/1234567890 "Agreed" --media /path/to/img.png
+gobird reply 1234567890 "This" --json
 ```
 
 ---
@@ -450,17 +450,17 @@ Search tweets.
 
 **Syntax:**
 ```
-bird search <query>
+gobird search <query>
 ```
 
 **Description:** Searches for tweets matching the query. Supports Twitter's full search syntax (operators like `from:`, `to:`, `#hashtag`, `"exact phrase"`, etc.). Paginated.
 
 **Examples:**
 ```sh
-bird search "golang"
-bird search "from:user filter:links" --count 50
-bird search "#gobird" --json
-bird search "site:example.com" --max-pages 3 --plain
+gobird search "golang"
+gobird search "from:user filter:links" --count 50
+gobird search "#gobird" --json
+gobird search "site:example.com" --max-pages 3 --plain
 ```
 
 ---
@@ -471,7 +471,7 @@ Fetch mentions of a user.
 
 **Syntax:**
 ```
-bird mentions [--user <handle>]
+gobird mentions [--user <handle>]
 ```
 
 **Description:** Returns tweets that mention the specified handle. Defaults to the currently authenticated user when `--user` is not given.
@@ -485,11 +485,11 @@ bird mentions [--user <handle>]
 **Examples:**
 ```sh
 # Mentions of the authenticated user
-bird mentions
+gobird mentions
 
 # Mentions of a specific user
-bird mentions --user someuser
-bird mentions --user someuser --count 25 --json
+gobird mentions --user someuser
+gobird mentions --user someuser --count 25 --json
 ```
 
 ---
@@ -500,7 +500,7 @@ Fetch the home timeline.
 
 **Syntax:**
 ```
-bird home [--latest]
+gobird home [--latest]
 ```
 
 **Description:** Returns tweets from the authenticated user's home timeline. By default uses the algorithmic feed. With `--latest`, uses the chronological "Following" feed.
@@ -517,10 +517,10 @@ Note: the command-local `--json` and `--limit` flags shadow the global flags wit
 
 **Examples:**
 ```sh
-bird home
-bird home --latest
-bird home --limit 30 --json
-bird home --latest --plain --no-emoji
+gobird home
+gobird home --latest
+gobird home --limit 30 --json
+gobird home --latest --plain --no-emoji
 ```
 
 ---
@@ -531,7 +531,7 @@ Fetch bookmarks.
 
 **Syntax:**
 ```
-bird bookmarks [--folder <folder-id>]
+gobird bookmarks [--folder <folder-id>]
 ```
 
 **Description:** Returns bookmarked tweets for the authenticated user. Optionally fetch from a specific bookmark folder.
@@ -546,10 +546,10 @@ bird bookmarks [--folder <folder-id>]
 
 **Examples:**
 ```sh
-bird bookmarks
-bird bookmarks --limit 20
-bird bookmarks --folder VjlhbGxhYnVzAAA= --json
-bird bookmarks --plain --count 50
+gobird bookmarks
+gobird bookmarks --limit 20
+gobird bookmarks --folder VjlhbGxhYnVzAAA= --json
+gobird bookmarks --plain --count 50
 ```
 
 ---
@@ -560,15 +560,15 @@ Remove a tweet from bookmarks.
 
 **Syntax:**
 ```
-bird unbookmark <tweet-id-or-url>
+gobird unbookmark <tweet-id-or-url>
 ```
 
 **Description:** Removes the specified tweet from the authenticated user's bookmarks. Prints `unbookmarked <id>` on success.
 
 **Examples:**
 ```sh
-bird unbookmark 1234567890123456789
-bird unbookmark https://x.com/user/status/1234567890123456789
+gobird unbookmark 1234567890123456789
+gobird unbookmark https://x.com/user/status/1234567890123456789
 ```
 
 ---
@@ -579,7 +579,7 @@ List users the account follows.
 
 **Syntax:**
 ```
-bird following [--user <numeric-id>]
+gobird following [--user <numeric-id>]
 ```
 
 **Description:** Returns the list of users that the given account follows. Defaults to the authenticated user. The `--user` flag requires a numeric user ID, not a handle.
@@ -594,9 +594,9 @@ bird following [--user <numeric-id>]
 
 **Examples:**
 ```sh
-bird following
-bird following --user 123456789
-bird following --limit 100 --json
+gobird following
+gobird following --user 123456789
+gobird following --limit 100 --json
 ```
 
 ---
@@ -607,7 +607,7 @@ List followers of the account.
 
 **Syntax:**
 ```
-bird followers [--user <numeric-id>]
+gobird followers [--user <numeric-id>]
 ```
 
 **Description:** Returns the list of users who follow the given account. Defaults to the authenticated user. `--user` requires a numeric ID.
@@ -622,9 +622,9 @@ bird followers [--user <numeric-id>]
 
 **Examples:**
 ```sh
-bird followers
-bird followers --user 123456789 --limit 200
-bird followers --json
+gobird followers
+gobird followers --user 123456789 --limit 200
+gobird followers --json
 ```
 
 ---
@@ -635,7 +635,7 @@ Fetch tweets liked by the current user.
 
 **Syntax:**
 ```
-bird likes
+gobird likes
 ```
 
 **Command-specific flags:**
@@ -647,8 +647,8 @@ bird likes
 
 **Examples:**
 ```sh
-bird likes
-bird likes --limit 50 --json
+gobird likes
+gobird likes --limit 50 --json
 ```
 
 ---
@@ -659,7 +659,7 @@ Print the currently authenticated user.
 
 **Syntax:**
 ```
-bird whoami
+gobird whoami
 ```
 
 **Description:** Resolves the credentials and prints the authenticated user's numeric ID, handle, and display name.
@@ -673,8 +673,8 @@ Name: Display Name
 
 **Examples:**
 ```sh
-bird whoami
-bird whoami --auth-token <token> --ct0 <ct0>
+gobird whoami
+gobird whoami --auth-token <token> --ct0 <ct0>
 ```
 
 ---
@@ -685,7 +685,7 @@ Show account info for a user.
 
 **Syntax:**
 ```
-bird about <@handle>
+gobird about <@handle>
 ```
 
 **Description:** Fetches and displays public profile information for the given handle using the `AboutAccountQuery` endpoint.
@@ -702,9 +702,9 @@ Created: Mon Jan 02 15:04:05 +0000 2006
 
 **Examples:**
 ```sh
-bird about @golang
-bird about golang
-bird about @someuser
+gobird about @golang
+gobird about golang
+gobird about @someuser
 ```
 
 ---
@@ -715,15 +715,15 @@ Follow a user.
 
 **Syntax:**
 ```
-bird follow <@handle-or-numeric-id>
+gobird follow <@handle-or-numeric-id>
 ```
 
 **Description:** Follows the given user. Accepts either `@handle` (resolved to a numeric ID via API lookup) or a bare numeric ID. Prints `followed <handle>` on success.
 
 **Examples:**
 ```sh
-bird follow @golang
-bird follow 123456789
+gobird follow @golang
+gobird follow 123456789
 ```
 
 ---
@@ -734,15 +734,15 @@ Unfollow a user.
 
 **Syntax:**
 ```
-bird unfollow <@handle-or-numeric-id>
+gobird unfollow <@handle-or-numeric-id>
 ```
 
 **Description:** Unfollows the given user. Prints `unfollowed <handle>` on success.
 
 **Examples:**
 ```sh
-bird unfollow @spamaccount
-bird unfollow 123456789
+gobird unfollow @spamaccount
+gobird unfollow 123456789
 ```
 
 ---
@@ -753,7 +753,7 @@ Fetch tweets from a user's timeline.
 
 **Syntax:**
 ```
-bird user-tweets <@handle>
+gobird user-tweets <@handle>
 ```
 
 **Description:** Returns tweets posted by the given user. The handle argument may include or omit the `@` prefix.
@@ -767,9 +767,9 @@ bird user-tweets <@handle>
 
 **Examples:**
 ```sh
-bird user-tweets @golang
-bird user-tweets golang --limit 50
-bird user-tweets @user --json
+gobird user-tweets @golang
+gobird user-tweets golang --limit 50
+gobird user-tweets @user --json
 ```
 
 ---
@@ -780,7 +780,7 @@ List owned lists or memberships.
 
 **Syntax:**
 ```
-bird lists [--memberships]
+gobird lists [--memberships]
 ```
 
 **Description:** Prints the authenticated user's owned Twitter lists. With `--memberships`, shows lists the user is a member of instead.
@@ -794,9 +794,9 @@ bird lists [--memberships]
 
 **Examples:**
 ```sh
-bird lists
-bird lists --memberships
-bird lists --json
+gobird lists
+gobird lists --memberships
+gobird lists --json
 ```
 
 ---
@@ -807,7 +807,7 @@ Fetch timeline for a list.
 
 **Syntax:**
 ```
-bird list-timeline <list-id-or-url>
+gobird list-timeline <list-id-or-url>
 ```
 
 **Description:** Returns tweets from the specified Twitter list's timeline. Accepts a numeric list ID or a URL of the form `https://x.com/i/lists/<id>`.
@@ -821,9 +821,9 @@ bird list-timeline <list-id-or-url>
 
 **Examples:**
 ```sh
-bird list-timeline 1234567890123456789
-bird list-timeline https://x.com/i/lists/1234567890123456789
-bird list-timeline 1234567890 --limit 30 --json
+gobird list-timeline 1234567890123456789
+gobird list-timeline https://x.com/i/lists/1234567890123456789
+gobird list-timeline 1234567890 --limit 30 --json
 ```
 
 ---
@@ -834,7 +834,7 @@ Fetch news from explore tabs.
 
 **Syntax:**
 ```
-bird news [--tabs <tab1,tab2,...>]
+gobird news [--tabs <tab1,tab2,...>]
 ```
 
 **Description:** Fetches news items from Twitter's Explore tabs. Default tabs (when `--tabs` is not specified): `forYou`, `news`, `sports`, `entertainment`. Deduplicates items across tabs.
@@ -851,10 +851,10 @@ Available tab names: `forYou`, `news`, `sports`, `entertainment`, `trending`.
 
 **Examples:**
 ```sh
-bird news
-bird news --tabs news,sports
-bird news --tabs forYou --limit 10 --json
-bird news --plain
+gobird news
+gobird news --tabs news,sports
+gobird news --tabs forYou --limit 10 --json
+gobird news --plain
 ```
 
 ---
@@ -865,10 +865,10 @@ Fetch trending topics.
 
 **Syntax:**
 ```
-bird trending
+gobird trending
 ```
 
-**Description:** Fetches trending topics from the `trending` Explore tab. This is a convenience alias equivalent to `bird news --tabs trending`.
+**Description:** Fetches trending topics from the `trending` Explore tab. This is a convenience alias equivalent to `gobird news --tabs trending`.
 
 **Command-specific flags:**
 
@@ -879,9 +879,9 @@ bird trending
 
 **Examples:**
 ```sh
-bird trending
-bird trending --json
-bird trending --limit 10 --plain
+gobird trending
+gobird trending --json
+gobird trending --limit 10 --plain
 ```
 
 ---
@@ -892,7 +892,7 @@ Validate credentials and print current user.
 
 **Syntax:**
 ```
-bird check
+gobird check
 ```
 
 **Description:** Resolves credentials, makes an authenticated API call, and prints `OK: @handle` on success. Prefixes errors with `FAIL:`. Useful for verifying that authentication is working correctly.
@@ -901,13 +901,13 @@ bird check
 
 **Examples:**
 ```sh
-bird check
+gobird check
 # OK: @myhandle
 
-bird check --browser safari
+gobird check --browser safari
 # OK: @myhandle
 
-AUTH_TOKEN=... CT0=... bird check
+AUTH_TOKEN=... CT0=... gobird check
 # OK: @myhandle
 ```
 
@@ -919,15 +919,15 @@ Print the current fallback query ID cache.
 
 **Syntax:**
 ```
-bird query-ids
+gobird query-ids
 ```
 
 **Description:** Prints the hardcoded fallback GraphQL query IDs as JSON. Useful for debugging API query routing or verifying which IDs the binary was compiled with.
 
 **Examples:**
 ```sh
-bird query-ids
-bird query-ids | jq '.TweetDetail'
+gobird query-ids
+gobird query-ids | jq '.TweetDetail'
 ```
 
 ---

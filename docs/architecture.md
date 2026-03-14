@@ -17,7 +17,7 @@ The underlying protocol is Twitter/X's private GraphQL and REST v1.1 APIs. gobir
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ cmd/bird/main.go                                                          │
+│ cmd/gobird/main.go                                                        │
 │  (binary entrypoint, wires SetBuildInfo + NewRootCmd)                    │
 └──────────────────────────────────┬────────────────────────────────────────┘
                                    │ calls
@@ -109,10 +109,10 @@ Each layer may only import layers below it. `internal/types` has no internal imp
 
 | Package | Responsibility |
 |---|---|
-| `cmd/bird` | Binary entrypoint. Calls `cli.SetBuildInfo` and `cli.NewRootCmd`, runs cobra, maps errors to exit codes. |
+| `cmd/gobird` | Binary entrypoint. Calls `cli.SetBuildInfo` and `cli.NewRootCmd`, runs cobra, maps errors to exit codes. |
 | `internal/cli` | All cobra command definitions. Reads config, resolves credentials, builds `bird.Client`, dispatches API calls, formats output. |
 | `internal/auth` | Three-tier credential resolution: CLI flags → environment variables → browser cookie extraction (Safari, Chrome, Firefox). Validates `auth_token` (40 hex chars) and `ct0` (32–160 alphanumeric chars). |
-| `internal/config` | Loads `~/.config/bird/config.json5` and `./.birdrc.json5` (local overrides global). Accepts JSON5 via `hujson`. Applies env var overlay on top. |
+| `internal/config` | Loads `~/.config/gobird/config.json5` and `./.gobirdrc.json5` (local overrides global). Accepts JSON5 via `hujson`. Applies env var overlay on top. |
 | `pkg/bird` | Public stable API surface. Contains type aliases (not re-declarations) for every type in `internal/types`. Wraps `internal/client.Client` in `bird.Client`. Delegates all methods one-for-one. |
 | `internal/client` | All Twitter/X API logic. HTTP request construction, credential headers, query-ID resolution and refresh, feature flag sets, pagination patterns, retry strategies. Splits into domain files per operation group. |
 | `internal/parsing` | Pure transformation functions: wire GraphQL structs → normalized `types.*` structs. No HTTP, no state. |

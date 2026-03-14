@@ -12,6 +12,44 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var usageErrorMarkers = []string{
+	"invalid value",
+	"unknown command",
+	"unknown flag",
+	"missing required flag",
+	"accepts ",
+	"requires ",
+	"must be a numeric user ID",
+	"more --alt values than --media values",
+	"mutually exclusive",
+}
+
+var usageErrorPrefixes = []string{
+	"invalid flags:",
+	"invalid value:",
+	"invalid tweet ID or URL:",
+	"invalid list ID or URL:",
+	"invalid handle:",
+	"invalid cookie source ",
+	"unsupported media type ",
+	"media file too large:",
+}
+
+func isUsageError(err error) bool {
+	msg := err.Error()
+	for _, prefix := range usageErrorPrefixes {
+		if strings.HasPrefix(msg, prefix) {
+			return true
+		}
+	}
+	for _, marker := range usageErrorMarkers {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 var (
 	buildVersion = "dev"
 	buildGitSHA  = "unknown"
@@ -156,14 +194,8 @@ func ExitCode(err error) int {
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return 1
 	}
-	msg := err.Error()
 	switch {
-	case strings.Contains(msg, "unknown command"),
-		strings.Contains(msg, "unknown flag"),
-		strings.Contains(msg, "accepts"),
-		strings.Contains(msg, "requires"),
-		strings.Contains(msg, "invalid"),
-		strings.Contains(msg, "missing"):
+	case isUsageError(err):
 		return 2
 	default:
 		return 1

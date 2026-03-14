@@ -6,9 +6,9 @@ import (
 )
 
 var (
-	tweetURLRe = regexp.MustCompile(`https?://(?:twitter\.com|x\.com)/\w+/status/(\d+)`)
+	tweetURLRe = regexp.MustCompile(`^https?://(?:twitter\.com|x\.com)/\w+/status/(\d+)(?:[/?].*)?$`)
 	tweetIDRe  = regexp.MustCompile(`^\d{15,20}$`)
-	listURLRe  = regexp.MustCompile(`(?:twitter\.com|x\.com)/i/lists/(\d+)`)
+	listURLRe  = regexp.MustCompile(`^https?://(?:twitter\.com|x\.com)/i/lists/(\d+)(?:[/?].*)?$`)
 	listIDRe   = regexp.MustCompile(`^\d{5,20}$`)
 )
 

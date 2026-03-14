@@ -141,6 +141,25 @@ func TestExtractListID_Invalid(t *testing.T) {
 	}
 }
 
+func TestLooksLikeTweetInput_EmbeddedURLRejected(t *testing.T) {
+	if parsing.LooksLikeTweetInput("prefix https://x.com/user/status/1234567890123456789 suffix") {
+		t.Error("embedded URL should not be treated as a tweet input")
+	}
+}
+
+func TestExtractTweetID_EmbeddedURLRejected(t *testing.T) {
+	if got := parsing.ExtractTweetID("prefix https://x.com/user/status/1234567890123456789 suffix"); got != "" {
+		t.Errorf("want empty, got %q", got)
+	}
+}
+
+func TestExtractListID_XComURL(t *testing.T) {
+	got := parsing.ExtractListID("https://x.com/i/lists/123456?s=20")
+	if got != "123456" {
+		t.Errorf("want 123456, got %q", got)
+	}
+}
+
 func TestExtractTweetID_XComURL(t *testing.T) {
 	got := parsing.ExtractTweetID("https://x.com/alice/status/1234567890123456789")
 	if got != "1234567890123456789" {

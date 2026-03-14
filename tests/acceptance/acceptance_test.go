@@ -229,8 +229,8 @@ func TestHelp_Output(t *testing.T) {
 	if err != nil {
 		t.Fatalf("help failed: %v", err)
 	}
-	if !strings.Contains(stdout, "bird") {
-		t.Errorf("help output missing 'bird': %q", stdout)
+	if !strings.Contains(stdout, "gobird") {
+		t.Errorf("help output missing 'gobird': %q", stdout)
 	}
 }
 

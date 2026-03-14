@@ -8,6 +8,31 @@ import (
 	"time"
 )
 
+func scrapeBody(ctx context.Context, client *http.Client, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("user-agent", UserAgent)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	body, readErr := io.ReadAll(resp.Body)
+	closeErr := resp.Body.Close()
+	if readErr != nil {
+		return nil, readErr
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, &httpError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+	return body, nil
+}
+
 // getQueryID returns the active query ID for the given operation.
 // Priority: runtime cache → bundled baseline → fallback.
 func (c *Client) getQueryID(operation string) string {
@@ -106,17 +131,7 @@ func scrapeQueryIDs(ctx context.Context) map[string]string {
 	visitedScripts := map[string]bool{}
 
 	for _, pageURL := range pages {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
-		if err != nil {
-			continue
-		}
-		req.Header.Set("user-agent", UserAgent)
-		resp, err := client.Do(req)
-		if err != nil {
-			continue
-		}
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close() //nolint:errcheck
+		body, err := scrapeBody(ctx, client, pageURL)
 		if err != nil {
 			continue
 		}
@@ -126,17 +141,7 @@ func scrapeQueryIDs(ctx context.Context) map[string]string {
 			}
 			visitedScripts[scriptURL] = true
 
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, scriptURL, nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Set("user-agent", UserAgent)
-			resp, err := client.Do(req)
-			if err != nil {
-				continue
-			}
-			scriptBody, err := io.ReadAll(resp.Body)
-			resp.Body.Close() //nolint:errcheck
+			scriptBody, err := scrapeBody(ctx, client, scriptURL)
 			if err != nil {
 				continue
 			}

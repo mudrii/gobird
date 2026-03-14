@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Go**: 1.26.1 or later (see `go.mod`)
+- **Go**: 1.24 or later (see `go.mod`)
 - **golangci-lint**: for linting (`go install github.com/golangci-lint/golangci-lint/cmd/golangci-lint@latest` or via Homebrew)
 - **git**: for version injection into the binary
 - **macOS**: required for browser cookie extraction features (Chrome AES-CBC decryption via Keychain, Safari's `Cookies.db`, Firefox SQLite stores)
@@ -52,7 +52,7 @@ gobird/
 
 **`internal/types/`**: All shared type definitions. `models.go` defines normalized output types (`TweetData`, `TwitterUser`, etc.). `wire.go` defines raw GraphQL response structs. `options.go` defines fetch option structs. `results.go` defines generic `PageResult[T]` and `PaginatedResult[T]`.
 
-**`internal/config/`**: JSON5 config file loading. Uses `tailscale/hujson` to normalize JSON5 to standard JSON. Searches `~/.config/bird/config.json5` then `./.birdrc.json5`. Environment variables (`AUTH_TOKEN`, `CT0`, `BIRD_TIMEOUT_MS`, etc.) overlay the file config.
+**`internal/config/`**: JSON5 config file loading. Uses `tailscale/hujson` to normalize JSON5 to standard JSON. Searches `~/.config/gobird/config.json5` then `./.gobirdrc.json5`. Environment variables (`AUTH_TOKEN`, `CT0`, `BIRD_TIMEOUT_MS`, etc.) overlay the file config.
 
 **`internal/output/`**: Terminal output formatting. Provides `PrintJSON`, colored tweet rendering, and `FormatOptions` (plain/no-color/no-emoji).
 
@@ -65,11 +65,11 @@ gobird/
 ## Build Instructions
 
 ```bash
-# Build the binary to bin/bird
+# Build the binary to bin/gobird
 make build
 
 # Direct go build (equivalent)
-go build -ldflags "-X main.version=$(git describe --tags --always --dirty) -X main.gitSHA=$(git rev-parse --short HEAD)" -o bin/bird ./cmd/gobird
+go build -ldflags "-X main.version=$(git describe --tags --always --dirty) -X main.gitSHA=$(git rev-parse --short HEAD)" -o bin/gobird ./cmd/gobird
 ```
 
 The binary embeds `version` and `gitSHA` at link time. Without git, these default to `dev` and `unknown`.
@@ -104,7 +104,7 @@ make vet         # runs go vet ./...
 make fmt         # runs gofmt -w .
 ```
 
-The `.golangci.yml` enables five linters: `errcheck`, `govet`, `staticcheck`, `unused`, `revive`. The `revive` `exported` rule is configured with `disableStutteringCheck`. Test files are exempted from `errcheck` and `revive`. `errcheck` is also suppressed for `.Close()` return values (annotated with `//nolint:errcheck`).
+The `.golangci.yml` enables `errcheck`, `errorlint`, `gosec`, `govet`, `ineffassign`, `nilerr`, `staticcheck`, `unused`, `unparam`, and `revive`. The `revive` `exported` rule is configured with `disableStutteringCheck`. Test files are exempted from `revive`.
 
 ---
 

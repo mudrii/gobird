@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/mudrii/gobird/internal/testutil"
@@ -182,5 +183,22 @@ func TestGetFollowing_404TriggersRefresh_NoRealHTTP(t *testing.T) {
 	_, _ = c.GetFollowing(context.Background(), "user-x", nil)
 	if calls < 2 {
 		t.Errorf("want at least 2 calls for 404+refresh pattern, got %d", calls)
+	}
+}
+
+func TestScrapeBody_Non2xx(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(503)
+		_, _ = w.Write([]byte(`service unavailable`))
+	}))
+	defer srv.Close()
+
+	_, err := scrapeBody(context.Background(), &http.Client{}, srv.URL)
+	if err == nil {
+		t.Fatal("expected non-2xx scrapeBody error")
+	}
+	status, ok := HTTPStatusCode(err)
+	if !ok || status != 503 {
+		t.Fatalf("want HTTP 503 error, got %v", err)
 	}
 }

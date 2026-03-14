@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -147,12 +148,14 @@ func detectMime(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close() //nolint:errcheck
-
 	buf := make([]byte, 512)
 	n, err := io.ReadFull(f, buf)
-	if err != nil && err != io.ErrUnexpectedEOF {
+	closeErr := f.Close()
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return "", err
+	}
+	if closeErr != nil {
+		return "", closeErr
 	}
 	return http.DetectContentType(buf[:n]), nil
 }

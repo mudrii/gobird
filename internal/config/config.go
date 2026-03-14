@@ -3,6 +3,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -33,7 +34,7 @@ func (s *StringOrSlice) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Config holds all configurable bird settings.
+// Config holds all configurable gobird settings.
 type Config struct {
 	// AuthToken is the Twitter auth_token cookie value.
 	AuthToken string `json:"authToken"`
@@ -61,9 +62,9 @@ type Config struct {
 	FeatureOverridesPath string `json:"featureOverridesPath"`
 }
 
-// Load reads and parses the bird config files, applying env var overrides.
-// Order: explicit path or $BIRD_CONFIG; otherwise global ~/.config/bird/config.json5
-// followed by local ./.birdrc.json5, with local overriding global.
+// Load reads and parses the gobird config files, applying env var overrides.
+// Order: explicit path or $BIRD_CONFIG; otherwise global ~/.config/gobird/config.json5
+// followed by local ./.gobirdrc.json5, with local overriding global.
 func Load(explicitPath string) (*Config, error) {
 	cfg := &Config{}
 	if path := explicitOrEnvPath(explicitPath); path != "" {
@@ -71,7 +72,11 @@ func Load(explicitPath string) (*Config, error) {
 			return nil, err
 		}
 	} else {
-		for _, path := range defaultConfigPaths() {
+		paths, err := defaultConfigPaths()
+		if err != nil {
+			return nil, err
+		}
+		for _, path := range paths {
 			if path == "" {
 				continue
 			}
@@ -83,7 +88,9 @@ func Load(explicitPath string) (*Config, error) {
 		}
 	}
 	applyDefaults(cfg)
-	applyEnv(cfg)
+	if err := applyEnv(cfg); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 
@@ -97,21 +104,21 @@ func explicitOrEnvPath(explicit string) string {
 	return ""
 }
 
-func defaultConfigPaths() []string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil
+func defaultConfigPaths() ([]string, error) {
+	home, homeErr := os.UserHomeDir()
+	if homeErr != nil {
+		return nil, fmt.Errorf("resolve home directory: %w", homeErr)
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
+	cwd, cwdErr := os.Getwd()
+	if cwdErr != nil {
 		return []string{
-			filepath.Join(home, ".config", "bird", "config.json5"),
-		}
+			filepath.Join(home, ".config", "gobird", "config.json5"),
+		}, nil
 	}
 	return []string{
-		filepath.Join(home, ".config", "bird", "config.json5"),
-		filepath.Join(cwd, ".birdrc.json5"),
-	}
+		filepath.Join(home, ".config", "gobird", "config.json5"),
+		filepath.Join(cwd, ".gobirdrc.json5"),
+	}, nil
 }
 
 func loadFile(path string, cfg *Config) error {
@@ -136,7 +143,7 @@ func applyDefaults(cfg *Config) {
 
 // applyEnv overlays environment variables onto the loaded config.
 // Env vars take precedence over file values.
-func applyEnv(cfg *Config) {
+func applyEnv(cfg *Config) error {
 	// Credential resolution order: AUTH_TOKEN > TWITTER_AUTH_TOKEN.
 	if v := os.Getenv("AUTH_TOKEN"); v != "" {
 		cfg.AuthToken = v
@@ -150,18 +157,25 @@ func applyEnv(cfg *Config) {
 		cfg.Ct0 = v
 	}
 	if v := os.Getenv("BIRD_TIMEOUT_MS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.TimeoutMs = n
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return fmt.Errorf("invalid value for BIRD_TIMEOUT_MS: %q; expected integer milliseconds", v)
 		}
+		cfg.TimeoutMs = n
 	}
 	if v := os.Getenv("BIRD_COOKIE_TIMEOUT_MS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.CookieTimeoutMs = n
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return fmt.Errorf("invalid value for BIRD_COOKIE_TIMEOUT_MS: %q; expected integer milliseconds", v)
 		}
+		cfg.CookieTimeoutMs = n
 	}
 	if v := os.Getenv("BIRD_QUOTE_DEPTH"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.QuoteDepth = n
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return fmt.Errorf("invalid value for BIRD_QUOTE_DEPTH: %q; expected integer", v)
 		}
+		cfg.QuoteDepth = n
 	}
+	return nil
 }

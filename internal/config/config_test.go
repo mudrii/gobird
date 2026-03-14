@@ -14,7 +14,7 @@ func TestLoadEmptyWhenNoFile(t *testing.T) {
 	for _, e := range []string{"AUTH_TOKEN", "TWITTER_AUTH_TOKEN", "CT0", "TWITTER_CT0", "BIRD_CONFIG"} {
 		t.Setenv(e, "")
 	}
-	cfg, err := config.Load("/nonexistent/path/bird.json5")
+	cfg, err := config.Load("/nonexistent/path/gobird.json5")
 	if err == nil {
 		t.Fatalf("expected error for nonexistent path, got nil with cfg=%+v", cfg)
 	}
@@ -24,7 +24,7 @@ func TestLoadJSON5File(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json5")
 	content := `{
-		// bird config
+	// gobird config
 		"authToken": "mytoken",
 		"ct0": "myct0",
 	}`
@@ -112,10 +112,10 @@ func TestLoad_ExplicitPath_NotFound(t *testing.T) {
 	}
 }
 
-// TestLoad_EnvVarPath verifies that BIRD_CONFIG env var is honoured.
+	// TestLoad_EnvVarPath verifies that BIRD_CONFIG env var is honoured.
 func TestLoad_EnvVarPath(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "bird.json5")
+	path := filepath.Join(dir, "gobird.json5")
 	if err := os.WriteFile(path, []byte(`{"authToken":"envpath-tok","ct0":"envpath-ct0"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}

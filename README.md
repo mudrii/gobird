@@ -37,11 +37,7 @@ gobird is a Twitter/X CLI tool and Go client library.
 go install github.com/mudrii/gobird/cmd/gobird@latest
 ```
 
-The binary is installed as `gobird`. Rename or alias it to `bird` for shorter invocations:
-
-```sh
-ln -s "$(go env GOPATH)/bin/gobird" "$(go env GOPATH)/bin/bird"
-```
+The binary is installed as `gobird`.
 
 ### Build from source
 
@@ -289,8 +285,8 @@ Methods that follow this pattern: `Search`, `GetAllSearchResults`, `GetHomeTimel
 
 Config is loaded from the following locations, in order (later entries override earlier ones):
 
-1. `~/.config/bird/config.json5` — global
-2. `./.birdrc.json5` — project-local
+1. `~/.config/gobird/config.json5` — global
+2. `./.gobirdrc.json5` — project-local
 3. Path from `$BIRD_CONFIG` env var or `--config` flag — explicit override
 
 Config files use [JSON5](https://json5.org/) syntax (comments and trailing commas are allowed).
@@ -298,7 +294,7 @@ Config files use [JSON5](https://json5.org/) syntax (comments and trailing comma
 ### Minimal example
 
 ```json5
-// ~/.config/bird/config.json5
+// ~/.config/gobird/config.json5
 {
   // Credentials (prefer env vars instead of storing tokens in a file)
   "authToken": "",
@@ -395,7 +391,7 @@ Use `--no-color` to disable ANSI colour while keeping emoji. Use `--no-emoji` to
 
 ## Requirements
 
-- Go 1.23 or later (module uses `go 1.26.1` toolchain directive)
+- Go 1.24 or later (module currently declares `go 1.24.0`)
 - macOS or Linux
 - For browser cookie extraction: Safari (macOS Keychain), Chrome / Chromium, or Firefox must be installed and logged in to x.com
 

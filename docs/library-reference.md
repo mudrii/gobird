@@ -31,7 +31,7 @@
 go get github.com/mudrii/gobird
 ```
 
-The minimum Go version is **1.26.1** (as declared in `go.mod`).
+The minimum Go version is **1.24** (as declared in `go.mod`).
 
 Import path:
 

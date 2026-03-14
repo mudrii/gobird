@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -13,7 +14,14 @@ import (
 
 // extractSafari reads cookies from Safari's binary Cookies.binarycookies file
 // via the SQLite-based WebKit cookie store on macOS.
-func extractSafari() (*types.TwitterCookies, error) {
+func extractSafari() (result *types.TwitterCookies, err error) {
+	return extractSafariWithContext(context.Background())
+}
+
+func extractSafariWithContext(ctx context.Context) (result *types.TwitterCookies, err error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("safari: home directory: %w", err)
@@ -32,15 +40,23 @@ func extractSafari() (*types.TwitterCookies, error) {
 	if err != nil {
 		return nil, fmt.Errorf("safari: open cookie database: %w", err)
 	}
-	defer db.Close() //nolint:errcheck
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("safari: close cookie database: %w", closeErr)
+		}
+	}()
 
-	rows, err := db.Query(
+	rows, err := db.QueryContext(ctx,
 		`SELECT domain, name, value FROM cookies WHERE name IN ('auth_token','ct0') AND (domain LIKE '%x.com' OR domain LIKE '%twitter.com')`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("safari: query cookies: %w", err)
 	}
-	defer rows.Close() //nolint:errcheck
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("safari: close cookies query: %w", closeErr)
+		}
+	}()
 
 	var cookies []domainCookie
 	for rows.Next() {
@@ -58,9 +74,10 @@ func extractSafari() (*types.TwitterCookies, error) {
 	if authToken == "" || ct0 == "" {
 		return nil, fmt.Errorf("safari: auth_token or ct0 not found")
 	}
-	return &types.TwitterCookies{
+	result = &types.TwitterCookies{
 		AuthToken:    authToken,
 		Ct0:          ct0,
 		CookieHeader: buildCookieHeader(authToken, ct0),
-	}, nil
+	}
+	return result, nil
 }

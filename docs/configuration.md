@@ -23,8 +23,8 @@ gobird loads configuration from files in the following order. Later files overri
 
 ### Default search order
 
-1. `~/.config/bird/config.json5` — global user configuration
-2. `./.birdrc.json5` — project-local config in the current working directory
+1. `~/.config/gobird/config.json5` — global user configuration
+2. `./.gobirdrc.json5` — project-local config in the current working directory
 
 Both files are loaded if they exist. The project-local file takes precedence on any fields it defines.
 
@@ -34,15 +34,15 @@ An explicit path bypasses the default search order entirely. Only that single fi
 
 **Via flag:**
 ```sh
-bird --config /path/to/myconfig.json5 home
+gobird --config /path/to/myconfig.json5 home
 ```
 
 **Via environment variable:**
 ```sh
-BIRD_CONFIG=/path/to/myconfig.json5 bird home
+BIRD_CONFIG=/path/to/myconfig.json5 gobird home
 ```
 
-When `--config` or `BIRD_CONFIG` is set, `~/.config/bird/config.json5` and `./.birdrc.json5` are both ignored.
+When `--config` or `BIRD_CONFIG` is set, `~/.config/gobird/config.json5` and `./.gobirdrc.json5` are both ignored.
 
 ### Loading algorithm (pseudo-code)
 
@@ -50,8 +50,8 @@ When `--config` or `BIRD_CONFIG` is set, `~/.config/bird/config.json5` and `./.b
 if --config flag or BIRD_CONFIG is set:
     load that single file
 else:
-    load ~/.config/bird/config.json5   (if it exists)
-    merge ./.birdrc.json5              (if it exists, overrides global)
+    load ~/.config/gobird/config.json5   (if it exists)
+    merge ./.gobirdrc.json5              (if it exists, overrides global)
 
 apply default values for any zero-value fields
 apply environment variable overrides
@@ -114,7 +114,7 @@ Complete field reference with types, defaults, and corresponding environment var
 | ChromeProfile | `chromeProfile` | `string` | `""` | — | Chrome profile name (e.g., `"Default"`, `"Profile 1"`) |
 | ChromeProfileDir | `chromeProfileDir` | `string` | `""` | — | Absolute path to Chrome profile directory or Cookies DB |
 | FirefoxProfile | `firefoxProfile` | `string` | `""` | — | Firefox profile name or substring for matching |
-| CookieSource | `cookieSource` | `string` or `[]string` | `[]` | — | Ordered list of browsers to try for cookie extraction |
+| CookieSource | `cookieSource` | `string` or `[]string` | unset | — | Ordered list of browsers to try for cookie extraction |
 | CookieTimeoutMs | `cookieTimeoutMs` | `int` | `0` | `BIRD_COOKIE_TIMEOUT_MS` | Cookie extraction timeout in milliseconds (0 = unlimited) |
 | TimeoutMs | `timeoutMs` | `int` | `0` (→ 30000) | `BIRD_TIMEOUT_MS` | HTTP request timeout in milliseconds (0 = 30000 default) |
 | QuoteDepth | `quoteDepth` | `int` | `1` | `BIRD_QUOTE_DEPTH` | Quoted tweet expansion depth |
@@ -202,7 +202,7 @@ Specifies the order in which browsers are tried for cookie extraction. Accepts a
 }
 ```
 
-When `cookieSource` is set, `defaultBrowser` is still used as a fallback if `cookieSource` is empty.
+When `cookieSource` is set, it must contain at least one non-empty browser name. Omit the field entirely to use `defaultBrowser` or the built-in default order.
 
 Priority resolution when multiple settings exist:
 1. `--cookie-source` flag(s) on the command line
@@ -343,7 +343,7 @@ When multiple domain entries exist (e.g., `.x.com` and `.twitter.com`), the `x.c
 
 ```sh
 # Explicitly select Safari:
-bird home --browser safari
+gobird home --browser safari
 
 # Or in config:
 # { "defaultBrowser": "safari" }
@@ -367,9 +367,9 @@ bird home --browser safari
 **Keychain access:** gobird calls `security find-generic-password -w -a Chrome -s "Chrome Safe Storage"`. This may trigger a macOS authorization dialog on first use. Use `--cookie-timeout` to set a deadline if Keychain access hangs.
 
 ```sh
-bird home --browser chrome
-bird home --browser chrome --chrome-profile "Work"
-bird home --chrome-profile-dir "/path/to/profile"
+gobird home --browser chrome
+gobird home --browser chrome --chrome-profile "Work"
+gobird home --chrome-profile-dir "/path/to/profile"
 ```
 
 ### Firefox
@@ -383,8 +383,8 @@ bird home --chrome-profile-dir "/path/to/profile"
 **No decryption required:** Firefox stores cookie values as plaintext.
 
 ```sh
-bird home --browser firefox
-bird home --browser firefox --firefox-profile "default-release"
+gobird home --browser firefox
+gobird home --browser firefox --firefox-profile "default-release"
 ```
 
 ### Extraction timeout
@@ -392,7 +392,7 @@ bird home --browser firefox --firefox-profile "default-release"
 Use `--cookie-timeout` (milliseconds) or `cookieTimeoutMs` in config to abort cookie extraction if it takes too long. This is especially useful when Chrome's Keychain authorization dialog may appear.
 
 ```sh
-bird home --browser chrome --cookie-timeout 5000
+gobird home --browser chrome --cookie-timeout 5000
 ```
 
 ```json5
@@ -467,17 +467,17 @@ For a given operation, features are assembled in this order (later entries win):
 
 **Disable a feature globally:**
 ```sh
-BIRD_FEATURES_JSON='{"global":{"vibe_api_enabled":false}}' bird home
+BIRD_FEATURES_JSON='{"global":{"vibe_api_enabled":false}}' gobird home
 ```
 
 **Override a feature for search only:**
 ```sh
-BIRD_FEATURES_JSON='{"sets":{"search":{"rweb_video_timestamps_enabled":false}}}' bird search golang
+BIRD_FEATURES_JSON='{"sets":{"search":{"rweb_video_timestamps_enabled":false}}}' gobird search golang
 ```
 
 **Using a file:**
 ```sh
-BIRD_FEATURES_PATH=/path/to/overrides.json bird home
+BIRD_FEATURES_PATH=/path/to/overrides.json gobird home
 ```
 
 ```json5
@@ -541,28 +541,28 @@ CLI flag > environment variable > config file value > built-in default
 
 ```sh
 # Use a different config file for one command:
-bird --config ~/.config/bird/work.json5 home
+gobird --config ~/.config/gobird/work.json5 home
 
 # Override credentials for one command:
-bird tweet "hello" --auth-token <token> --ct0 <ct0>
+gobird tweet "hello" --auth-token <token> --ct0 <ct0>
 
 # Override browser for one command:
-bird home --browser chrome --chrome-profile Work
+gobird home --browser chrome --chrome-profile Work
 
 # Override timeout for one command:
-bird bookmarks --timeout 120000
+gobird bookmarks --timeout 120000
 
 # Override cookie timeout for one command:
-bird check --browser chrome --cookie-timeout 3000
+gobird check --browser chrome --cookie-timeout 3000
 
 # Override quote depth for one command:
-bird read 1234567890 --quote-depth 3
+gobird read 1234567890 --quote-depth 3
 
 # Disable quoted tweet expansion for one command:
-bird thread 1234567890 --quote-depth 0
+gobird thread 1234567890 --quote-depth 0
 
 # Override the number of pages:
-bird following --max-pages 5
+gobird following --max-pages 5
 ```
 
 ### Flag-to-config field mapping
@@ -592,7 +592,7 @@ bird following --max-pages 5
 ### Minimal Safari config
 
 ```json5
-// ~/.config/bird/config.json5
+// ~/.config/gobird/config.json5
 {
   "defaultBrowser": "safari",
 }
@@ -632,12 +632,12 @@ bird following --max-pages 5
 }
 ```
 
-### Project-local override (`.birdrc.json5`)
+### Project-local override (`.gobirdrc.json5`)
 
 Place this in a project directory to use different credentials than your global config:
 
 ```json5
-// ./.birdrc.json5
+// ./.gobirdrc.json5
 {
   // Use a specific Chrome profile for this project's Twitter account
   "defaultBrowser": "chrome",
@@ -663,6 +663,6 @@ In CI, set credentials via environment variables:
 ```sh
 export AUTH_TOKEN=...
 export CT0=...
-bird check
-bird search "golang" --json > results.json
+gobird check
+gobird search "golang" --json > results.json
 ```

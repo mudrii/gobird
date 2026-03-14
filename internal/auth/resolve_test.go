@@ -1,6 +1,7 @@
 package auth_test
 
 import (
+	"context"
 	"errors"
 	"os"
 	"strings"
@@ -301,7 +302,7 @@ func TestFirstNonEmpty(t *testing.T) {
 // timeout returns its result.
 func TestExtractWithTimeout_Success(t *testing.T) {
 	want := &types.TwitterCookies{AuthToken: "a", Ct0: "b", CookieHeader: "auth_token=a; ct0=b"}
-	got, err := auth.ExportedExtractWithTimeout(500, func() (*types.TwitterCookies, error) {
+	got, err := auth.ExportedExtractWithTimeout(500, func(context.Context) (*types.TwitterCookies, error) {
 		return want, nil
 	})
 	if err != nil {
@@ -316,7 +317,7 @@ func TestExtractWithTimeout_Success(t *testing.T) {
 func TestExtractWithTimeout_NoTimeout(t *testing.T) {
 	called := false
 	want := &types.TwitterCookies{AuthToken: "x", Ct0: "y"}
-	got, err := auth.ExportedExtractWithTimeout(0, func() (*types.TwitterCookies, error) {
+	got, err := auth.ExportedExtractWithTimeout(0, func(context.Context) (*types.TwitterCookies, error) {
 		called = true
 		return want, nil
 	})
@@ -337,10 +338,12 @@ func TestExtractWithTimeout_Timeout(t *testing.T) {
 	done := make(chan struct{})
 	t.Cleanup(func() { close(done) })
 
-	_, err := auth.ExportedExtractWithTimeout(20, func() (*types.TwitterCookies, error) {
+	_, err := auth.ExportedExtractWithTimeout(20, func(ctx context.Context) (*types.TwitterCookies, error) {
 		timer := time.NewTimer(5 * time.Second)
 		defer timer.Stop()
 		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		case <-done:
 		case <-timer.C:
 		}
@@ -391,6 +394,7 @@ func TestNormalizeCookieSources_Invalid(t *testing.T) {
 	cases := [][]string{
 		{"edge"},
 		{"brave"},
+		{},
 		{""},
 		{"unknown"},
 		{"ie"},
@@ -426,6 +430,22 @@ func TestNormalizeCookieSources_CaseInsensitive(t *testing.T) {
 		}
 		if len(got) != 1 || got[0] != tc.want {
 			t.Errorf("input %q: want [%q], got %v", tc.input, tc.want, got)
+		}
+	}
+}
+
+func TestNormalizeCookieSources_TrimsAndSkipsEmpty(t *testing.T) {
+	got, err := auth.ExportedNormalizeCookieSources([]string{" Safari ", "", "  ", "CHROME", "firefox", "\t"})
+	if err != nil {
+		t.Fatalf("normalize cookie sources: %v", err)
+	}
+	expect := []string{"safari", "chrome", "firefox"}
+	if len(got) != len(expect) {
+		t.Fatalf("len: want %d, got %d", len(expect), len(got))
+	}
+	for i := range expect {
+		if got[i] != expect[i] {
+			t.Errorf("entry %d: want %q, got %q", i, expect[i], got[i])
 		}
 	}
 }

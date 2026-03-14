@@ -19,8 +19,8 @@ func TestRootHelp(t *testing.T) {
 		t.Fatalf("root --help: %v", err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, "bird") {
-		t.Errorf("help output missing 'bird': %q", out)
+	if !strings.Contains(out, "gobird") {
+		t.Errorf("help output missing 'gobird': %q", out)
 	}
 }
 
@@ -184,7 +184,7 @@ func TestPersistentPreRunE_NegativeCount(t *testing.T) {
 	}
 }
 
-// TestRootCmd_ShorthandRead verifies that `bird <invalid_url>` dispatches to
+// TestRootCmd_ShorthandRead verifies that `gobird <invalid_url>` dispatches to
 // the read subcommand. We use an invalid URL so the command fails at ID parsing
 // before any network call, confirming dispatch happened (not an auth error).
 func TestRootCmd_ShorthandRead(t *testing.T) {
@@ -202,7 +202,7 @@ func TestRootCmd_ShorthandRead(t *testing.T) {
 	}
 }
 
-// TestVersionCmd_Output verifies that `bird version` prints the version string.
+// TestVersionCmd_Output verifies that `gobird version` prints the version string.
 func TestVersionCmd_Output(t *testing.T) {
 	cli.SetBuildInfo("3.0.0", "fff9999")
 	cmd := cli.NewRootCmd()

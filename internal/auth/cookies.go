@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -11,12 +12,16 @@ import (
 func extractFromBrowserOrder(order []string, opts ResolveOptions) (*types.TwitterCookies, error) {
 	type extractor struct {
 		name string
-		fn   func() (*types.TwitterCookies, error)
+		fn   func(context.Context) (*types.TwitterCookies, error)
 	}
 	all := []extractor{
-		{"safari", func() (*types.TwitterCookies, error) { return extractSafari() }},
-		{"chrome", func() (*types.TwitterCookies, error) { return extractChrome(opts.ChromeProfile) }},
-		{"firefox", func() (*types.TwitterCookies, error) { return extractFirefox(opts.FirefoxProfile) }},
+		{"safari", func(ctx context.Context) (*types.TwitterCookies, error) { return extractSafariWithContext(ctx) }},
+		{"chrome", func(ctx context.Context) (*types.TwitterCookies, error) {
+			return extractChromeWithContext(ctx, opts.ChromeProfile)
+		}},
+		{"firefox", func(ctx context.Context) (*types.TwitterCookies, error) {
+			return extractFirefoxWithContext(ctx, opts.FirefoxProfile)
+		}},
 	}
 	if len(order) == 0 {
 		order = []string{"safari", "chrome", "firefox"}

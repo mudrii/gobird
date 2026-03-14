@@ -16,6 +16,15 @@ import (
 	"github.com/mudrii/gobird/internal/testutil"
 )
 
+type closeErrorBody struct {
+	*strings.Reader
+	closeErr error
+}
+
+func (b *closeErrorBody) Close() error {
+	return b.closeErr
+}
+
 func newBareTestClient(baseURL string) *Client {
 	transport := testutil.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		testReq, _ := http.NewRequestWithContext(r.Context(), r.Method, baseURL+r.URL.RequestURI(), r.Body)
@@ -70,6 +79,32 @@ func TestDoGET_404(t *testing.T) {
 	}
 	if !is404(err) {
 		t.Errorf("doGET: expected is404=true for 404, got false (err=%v)", err)
+	}
+}
+
+func TestDo_CloseError(t *testing.T) {
+	closeErr := errors.New("close failed")
+	c := New("tok", "ct0", &Options{
+		HTTPClient: &http.Client{
+			Transport: testutil.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: 200,
+					Header:     make(http.Header),
+					Body: &closeErrorBody{
+						Reader:   strings.NewReader(`{"ok":true}`),
+						closeErr: closeErr,
+					},
+				}, nil
+			}),
+		},
+	})
+
+	_, err := c.doGET(context.Background(), "https://example.com/test", c.getJSONHeaders())
+	if err == nil {
+		t.Fatal("expected error due to close failure")
+	}
+	if !strings.Contains(err.Error(), "close body") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -484,6 +519,35 @@ func TestFetchWithRetry_RetryAfterHeader(t *testing.T) {
 	}
 	if len(body) == 0 {
 		t.Error("expected non-empty body")
+	}
+}
+
+func TestFetchWithRetry_TransportErrorRetries(t *testing.T) {
+	var calls atomic.Int32
+	c := New("tok", "ct0", &Options{
+		HTTPClient: &http.Client{
+			Transport: testutil.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+				if calls.Add(1) < 3 {
+					return nil, errors.New("connection reset by peer")
+				}
+				return &http.Response{
+					StatusCode: 200,
+					Header:     make(http.Header),
+					Body:       io.NopCloser(strings.NewReader(`{"ok":true}`)),
+				}, nil
+			}),
+		},
+	})
+
+	body, err := c.fetchWithRetry(context.Background(), "https://example.com/data", c.getJSONHeaders())
+	if err != nil {
+		t.Fatalf("expected retry success after transport errors, got: %v", err)
+	}
+	if calls.Load() != 3 {
+		t.Fatalf("want 3 attempts, got %d", calls.Load())
+	}
+	if len(body) == 0 {
+		t.Fatal("expected non-empty body")
 	}
 }
 

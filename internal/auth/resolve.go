@@ -108,6 +108,9 @@ func normalizeCookieSources(sources []string) ([]string, error) {
 	out := make([]string, 0, len(sources))
 	for _, source := range sources {
 		source = strings.ToLower(strings.TrimSpace(source))
+		if source == "" {
+			continue
+		}
 		switch source {
 		case "safari", "chrome", "firefox":
 			out = append(out, source)
@@ -115,12 +118,15 @@ func normalizeCookieSources(sources []string) ([]string, error) {
 			return nil, fmt.Errorf("invalid cookie source %q", source)
 		}
 	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("cookie source list must not be empty")
+	}
 	return out, nil
 }
 
-func extractWithTimeout(timeoutMs int, fn func() (*types.TwitterCookies, error)) (*types.TwitterCookies, error) {
+func extractWithTimeout(timeoutMs int, fn func(context.Context) (*types.TwitterCookies, error)) (*types.TwitterCookies, error) {
 	if timeoutMs <= 0 {
-		return fn()
+		return fn(context.Background())
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
@@ -131,8 +137,11 @@ func extractWithTimeout(timeoutMs int, fn func() (*types.TwitterCookies, error))
 	}
 	ch := make(chan result, 1)
 	go func() {
-		creds, err := fn()
-		ch <- result{creds: creds, err: err}
+		creds, err := fn(ctx)
+		select {
+		case ch <- result{creds: creds, err: err}:
+		case <-ctx.Done():
+		}
 	}()
 
 	select {
@@ -157,7 +166,7 @@ func buildCookieHeader(authToken, ct0 string) string {
 }
 
 // ExportedExtractWithTimeout is the exported wrapper of extractWithTimeout for testing.
-func ExportedExtractWithTimeout(timeoutMs int, fn func() (*types.TwitterCookies, error)) (*types.TwitterCookies, error) {
+func ExportedExtractWithTimeout(timeoutMs int, fn func(context.Context) (*types.TwitterCookies, error)) (*types.TwitterCookies, error) {
 	return extractWithTimeout(timeoutMs, fn)
 }
 

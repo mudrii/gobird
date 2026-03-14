@@ -3,16 +3,38 @@ package client
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 )
+
+func retryDelay(attempt int, retryAfter string) time.Duration {
+	const baseDelayMs = 500
+
+	if retryAfter != "" {
+		if secs, err := strconv.Atoi(retryAfter); err == nil {
+			return time.Duration(secs) * time.Second
+		}
+	}
+
+	var jitterByte [1]byte
+	if _, err := rand.Read(jitterByte[:]); err != nil {
+		jitterByte[0] = 0
+	}
+	jitter := time.Duration(int(jitterByte[0])%baseDelayMs) * time.Millisecond
+
+	backoffMs := baseDelayMs
+	for i := 0; i < attempt; i++ {
+		backoffMs *= 2
+	}
+	return time.Duration(backoffMs)*time.Millisecond + jitter
+}
 
 // httpError represents a non-2xx HTTP response.
 type httpError struct {
@@ -99,10 +121,13 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s %s: %w", req.Method, req.URL.Path, err)
 	}
-	defer resp.Body.Close() //nolint:errcheck
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("%s %s: read body: %w", req.Method, req.URL.Path, err)
+	body, readErr := io.ReadAll(resp.Body)
+	closeErr := resp.Body.Close()
+	if readErr != nil {
+		return nil, fmt.Errorf("%s %s: read body: %w", req.Method, req.URL.Path, readErr)
+	}
+	if closeErr != nil {
+		return nil, fmt.Errorf("%s %s: close body: %w", req.Method, req.URL.Path, closeErr)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, &httpError{StatusCode: resp.StatusCode, Body: string(body)}
@@ -120,7 +145,6 @@ func retryableStatus(code int) bool {
 // maxRetries=2 → 3 total attempts (0, 1, 2). Correction #86: post-loop return is dead code.
 func (c *Client) fetchWithRetry(ctx context.Context, url string, headers http.Header) ([]byte, error) {
 	const maxRetries = 2
-	const baseDelayMs = 500
 
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -135,12 +159,25 @@ func (c *Client) fetchWithRetry(ctx context.Context, url string, headers http.He
 		}
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			return nil, err
+			lastErr = fmt.Errorf("%s %s: %w", req.Method, req.URL.Path, err)
+			if attempt == maxRetries {
+				return nil, lastErr
+			}
+			delay := retryDelay(attempt, "")
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
+			continue
 		}
 		body, readErr := io.ReadAll(resp.Body)
-		resp.Body.Close() //nolint:errcheck
+		closeErr := resp.Body.Close()
 		if readErr != nil {
-			return nil, readErr
+			return nil, fmt.Errorf("%s %s: read body: %w", req.Method, req.URL.Path, readErr)
+		}
+		if closeErr != nil {
+			return nil, fmt.Errorf("%s %s: close body: %w", req.Method, req.URL.Path, closeErr)
 		}
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
@@ -154,16 +191,7 @@ func (c *Client) fetchWithRetry(ctx context.Context, url string, headers http.He
 			return nil, lastErr
 		}
 
-		var delay time.Duration
-		if ra := resp.Header.Get("retry-after"); ra != "" {
-			if secs, parseErr := strconv.Atoi(ra); parseErr == nil {
-				delay = time.Duration(secs) * time.Second
-			}
-		}
-		if delay == 0 {
-			jitter := time.Duration(rand.Intn(baseDelayMs)) * time.Millisecond
-			delay = time.Duration(baseDelayMs<<uint(attempt))*time.Millisecond + jitter
-		}
+		delay := retryDelay(attempt, resp.Header.Get("retry-after"))
 
 		select {
 		case <-ctx.Done():

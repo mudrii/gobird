@@ -46,7 +46,7 @@ type Options struct {
 }
 
 // New creates a new Client with the given credentials.
-// authToken and ct0 must not be empty.
+// Callers are expected to validate credentials before constructing the client.
 func New(authToken, ct0 string, opts *Options) *Client {
 	c := &Client{
 		authToken:    authToken,

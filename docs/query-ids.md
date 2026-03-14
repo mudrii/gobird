@@ -225,7 +225,7 @@ When an operation consistently returns 404 or `GRAPHQL_VALIDATION_FAILED` even a
 
 ### Step 1: Find the New ID
 
-Run gobird's `bird check query-ids` command (or call `RefreshQueryIDs` manually) to attempt a live scrape. If successful, the new ID is cached at runtime.
+Run gobird's `gobird query-ids` command (or call `RefreshQueryIDs` manually) to attempt a live scrape. If successful, the new ID is cached at runtime.
 
 Alternatively, open X.com in a browser with Developer Tools open, filter network traffic to `graphql`, and look for the failing operation name in request URLs. Copy the 22-character segment before the operation name.
 

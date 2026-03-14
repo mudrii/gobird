@@ -4,9 +4,14 @@ linters:
   default: none
   enable:
     - errcheck
+    - errorlint
+    - gosec
     - govet
+    - ineffassign
+    - nilerr
     - staticcheck
     - unused
+    - unparam
     - revive
   settings:
     revive:
@@ -19,7 +24,27 @@ linters:
       - path: _test\.go
         linters:
           - errcheck
+          - gosec
           - revive
-      - linters:
-          - errcheck
-        text: "Error return value of `.*\\.Close` is not checked"
+      - path: internal/auth/chrome\.go
+        linters:
+          - gosec
+      - path: internal/cli/shared\.go
+        linters:
+          - gosec
+      - path: internal/client/http\.go
+        linters:
+          - gosec
+      - path: internal/client/constants\.go
+        linters:
+          - gosec
+      - path: internal/client/features\.go
+        linters:
+          - gosec
+      - path: internal/config/config\.go
+        linters:
+          - gosec
+          - nilerr
+      - path: internal/testutil/.*
+        linters:
+          - gosec

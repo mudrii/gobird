@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
@@ -20,8 +21,15 @@ import (
 
 // extractChrome reads cookies from Chrome's SQLite cookie store on macOS.
 // Cookie values are AES-128-CBC encrypted with a key derived from the macOS Keychain.
-func extractChrome(profileHint string) (*types.TwitterCookies, error) {
-	key, err := chromeCookieKey()
+func extractChrome(profileHint string) (result *types.TwitterCookies, err error) {
+	return extractChromeWithContext(context.Background(), profileHint)
+}
+
+func extractChromeWithContext(ctx context.Context, profileHint string) (result *types.TwitterCookies, err error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	key, err := chromeCookieKey(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("chrome: keychain key: %w", err)
 	}
@@ -41,20 +49,31 @@ func extractChrome(profileHint string) (*types.TwitterCookies, error) {
 	if dbPath == "" {
 		return nil, fmt.Errorf("chrome: cookie database not found")
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro&immutable=1")
 	if err != nil {
 		return nil, fmt.Errorf("chrome: open cookie database: %w", err)
 	}
-	defer db.Close() //nolint:errcheck
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("chrome: close cookie database: %w", closeErr)
+		}
+	}()
 
-	rows, err := db.Query(
+	rows, err := db.QueryContext(ctx,
 		`SELECT host_key, name, encrypted_value FROM cookies WHERE name IN ('auth_token','ct0') AND (host_key LIKE '%x.com' OR host_key LIKE '%twitter.com')`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("chrome: query cookies: %w", err)
 	}
-	defer rows.Close() //nolint:errcheck
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("chrome: close cookies query: %w", closeErr)
+		}
+	}()
 
 	var cookies []domainCookie
 	for rows.Next() {
@@ -77,11 +96,12 @@ func extractChrome(profileHint string) (*types.TwitterCookies, error) {
 	if authToken == "" || ct0 == "" {
 		return nil, fmt.Errorf("chrome: auth_token or ct0 not found")
 	}
-	return &types.TwitterCookies{
+	result = &types.TwitterCookies{
 		AuthToken:    authToken,
 		Ct0:          ct0,
 		CookieHeader: buildCookieHeader(authToken, ct0),
-	}, nil
+	}
+	return result, nil
 }
 
 func chromeCookieCandidates(home, profileHint string) []string {
@@ -107,8 +127,9 @@ func chromeCookieCandidates(home, profileHint string) []string {
 }
 
 // chromeCookieKey retrieves the AES key from the macOS Keychain.
-func chromeCookieKey() ([]byte, error) {
-	out, err := exec.Command(
+func chromeCookieKey(ctx context.Context) ([]byte, error) {
+	out, err := exec.CommandContext(
+		ctx,
 		"security", "find-generic-password",
 		"-w", "-a", "Chrome", "-s", "Chrome Safe Storage",
 	).Output()
