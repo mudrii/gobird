@@ -117,6 +117,31 @@ func TestMediaInit_httpError(t *testing.T) {
 	}
 }
 
+func TestMediaInit_EmptyMediaID(t *testing.T) {
+	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "media/upload") {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"media_id_string":""}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	_, err := c.UploadMedia(context.Background(), []byte("data"), "image/png", "")
+	if err == nil {
+		t.Fatal("expected error when media_id_string is empty")
+	}
+	if !strings.Contains(err.Error(), "media init") {
+		t.Errorf("expected media init validation error, got: %v", err)
+	}
+}
+
 func TestMediaAppend_httpError(t *testing.T) {
 	calls := 0
 	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

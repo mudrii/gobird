@@ -25,6 +25,7 @@ func (c *Client) GetCurrentUser(ctx context.Context) (*types.CurrentUserResult, 
 // getCurrentUser resolves the authenticated user's identity.
 // Tries 4 API endpoints then 2 HTML pages. Does NOT call UserByScreenName.
 func (c *Client) getCurrentUser(ctx context.Context) (*types.CurrentUserResult, error) {
+	var lastErr error
 	apiURLs := []string{
 		SettingsURL,
 		SettingsAPITwitterURL,
@@ -32,7 +33,12 @@ func (c *Client) getCurrentUser(ctx context.Context) (*types.CurrentUserResult, 
 		CredentialsAPITwitterURL,
 	}
 	for _, rawURL := range apiURLs {
-		if u := c.tryGetCurrentUserFromAPI(ctx, rawURL); u != nil {
+		u, err := c.tryGetCurrentUserFromAPI(ctx, rawURL)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if u != nil {
 			c.userIDMu.Lock()
 			if c.userID == "" {
 				c.userID = u.ID
@@ -44,7 +50,12 @@ func (c *Client) getCurrentUser(ctx context.Context) (*types.CurrentUserResult, 
 
 	htmlPages := []string{SettingsPageURL, SettingsPageTwitterURL}
 	for _, rawURL := range htmlPages {
-		if u := c.tryGetCurrentUserFromHTML(ctx, rawURL); u != nil {
+		u, err := c.tryGetCurrentUserFromHTML(ctx, rawURL)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if u != nil {
 			c.userIDMu.Lock()
 			if c.userID == "" {
 				c.userID = u.ID
@@ -53,18 +64,21 @@ func (c *Client) getCurrentUser(ctx context.Context) (*types.CurrentUserResult, 
 			return u, nil
 		}
 	}
-	return nil, fmt.Errorf("could not resolve current user")
+	if lastErr != nil {
+		return nil, fmt.Errorf("could not resolve current user: %w", lastErr)
+	}
+	return nil, fmt.Errorf("could not resolve current user: no user ID found in any endpoint response")
 }
 
-func (c *Client) tryGetCurrentUserFromAPI(ctx context.Context, rawURL string) *types.CurrentUserResult {
+func (c *Client) tryGetCurrentUserFromAPI(ctx context.Context, rawURL string) (*types.CurrentUserResult, error) {
 	body, err := c.doGET(ctx, rawURL, c.getJSONHeaders())
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	var v map[string]any
 	if err := json.Unmarshal(body, &v); err != nil {
-		return nil
+		return nil, err
 	}
 
 	id := firstStringLike(
@@ -79,7 +93,7 @@ func (c *Client) tryGetCurrentUserFromAPI(ctx context.Context, rawURL string) *t
 		nestedValue(v, "data", "user", "id"),
 	)
 	if id == "" {
-		return nil
+		return nil, nil
 	}
 
 	return &types.CurrentUserResult{
@@ -94,7 +108,7 @@ func (c *Client) tryGetCurrentUserFromAPI(ctx context.Context, rawURL string) *t
 			nestedValue(v, "user", "name"),
 			nestedValue(v, "data", "user", "name"),
 		),
-	}
+	}, nil
 }
 
 func nestedValue(v map[string]any, path ...string) any {
@@ -125,35 +139,37 @@ func firstStringLike(values ...any) string {
 	return ""
 }
 
-func (c *Client) tryGetCurrentUserFromHTML(ctx context.Context, rawURL string) *types.CurrentUserResult {
+func (c *Client) tryGetCurrentUserFromHTML(ctx context.Context, rawURL string) (*types.CurrentUserResult, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	req.Header.Set("cookie", "auth_token="+c.authToken+"; ct0="+c.ct0)
 	req.Header.Set("user-agent", UserAgent)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	defer resp.Body.Close() //nolint:errcheck
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	closeErr := resp.Body.Close()
+	if readErr != nil {
+		return nil, readErr
+	}
+	if closeErr != nil {
+		return nil, closeErr
 	}
 	s := string(body)
 
 	userID := firstCapture(htmlUserIDRe, s)
 	if userID == "" {
-		return nil
+		return nil, nil
 	}
 	return &types.CurrentUserResult{
 		ID:       userID,
 		Username: firstCapture(htmlScreenRe, s),
 		Name:     firstCapture(htmlNameRe, s),
-	}
+	}, nil
 }
 
 func firstCapture(re *regexp.Regexp, s string) string {

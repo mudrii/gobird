@@ -116,12 +116,15 @@ func (c *Client) doPOSTForm(ctx context.Context, url string, headers http.Header
 	return c.do(req)
 }
 
+// maxResponseBytes limits HTTP response body reads to 100 MiB.
+const maxResponseBytes = 100 * 1024 * 1024
+
 func (c *Client) do(req *http.Request) ([]byte, error) {
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%s %s: %w", req.Method, req.URL.Path, err)
 	}
-	body, readErr := io.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	closeErr := resp.Body.Close()
 	if readErr != nil {
 		return nil, fmt.Errorf("%s %s: read body: %w", req.Method, req.URL.Path, readErr)
@@ -171,7 +174,7 @@ func (c *Client) fetchWithRetry(ctx context.Context, url string, headers http.He
 			}
 			continue
 		}
-		body, readErr := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 		closeErr := resp.Body.Close()
 		if readErr != nil {
 			return nil, fmt.Errorf("%s %s: read body: %w", req.Method, req.URL.Path, readErr)
@@ -199,7 +202,6 @@ func (c *Client) fetchWithRetry(ctx context.Context, url string, headers http.He
 		case <-time.After(delay):
 		}
 	}
-	// Correction #86: this return is dead code — the loop above always returns.
 	return nil, lastErr
 }
 

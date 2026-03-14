@@ -124,14 +124,17 @@ func defaultConfigPaths() ([]string, error) {
 func loadFile(path string, cfg *Config) error {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("read config %s: %w", path, err)
 	}
 	// Normalize JSON5 → standard JSON.
 	std, err := hujson.Standardize(b)
 	if err != nil {
-		return err
+		return fmt.Errorf("parse config %s: %w", path, err)
 	}
-	return json.Unmarshal(std, cfg)
+	if err := json.Unmarshal(std, cfg); err != nil {
+		return fmt.Errorf("unmarshal config %s: %w", path, err)
+	}
+	return nil
 }
 
 // applyDefaults sets zero-value fields to their documented defaults.

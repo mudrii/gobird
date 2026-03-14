@@ -80,6 +80,9 @@ func (c *Client) mediaInit(ctx context.Context, totalBytes int, mimeType string)
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return "", err
 	}
+	if resp.MediaIDString == "" {
+		return "", fmt.Errorf("media init: empty media_id_string in response")
+	}
 	return resp.MediaIDString, nil
 }
 
@@ -122,9 +125,19 @@ func (c *Client) mediaAppend(ctx context.Context, mediaID string, segmentIndex i
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close() //nolint:errcheck
-	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		return fmt.Errorf("APPEND: drain body: %w", err)
+	bodyCopyErr := func() error {
+		_, copyErr := io.Copy(io.Discard, resp.Body)
+		if copyErr != nil {
+			return fmt.Errorf("APPEND: drain body: %w", copyErr)
+		}
+		return nil
+	}()
+	closeErr := resp.Body.Close()
+	if bodyCopyErr != nil {
+		return bodyCopyErr
+	}
+	if closeErr != nil {
+		return fmt.Errorf("APPEND: close body: %w", closeErr)
 	}
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("APPEND: HTTP %d", resp.StatusCode)

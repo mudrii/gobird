@@ -67,7 +67,7 @@ func extractSafariWithContext(ctx context.Context) (result *types.TwitterCookies
 		cookies = append(cookies, c)
 	}
 	if rows.Err() != nil {
-		return nil, rows.Err()
+		return nil, fmt.Errorf("safari: iterate cookies: %w", rows.Err())
 	}
 
 	authToken, ct0 := preferredDomainCookies(cookies)

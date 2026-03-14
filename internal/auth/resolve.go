@@ -165,11 +165,6 @@ func buildCookieHeader(authToken, ct0 string) string {
 	return "auth_token=" + authToken + "; ct0=" + ct0
 }
 
-// ExportedExtractWithTimeout is the exported wrapper of extractWithTimeout for testing.
-func ExportedExtractWithTimeout(timeoutMs int, fn func(context.Context) (*types.TwitterCookies, error)) (*types.TwitterCookies, error) {
-	return extractWithTimeout(timeoutMs, fn)
-}
-
 // ExtractSafariCookies reads Twitter cookies from Safari.
 func ExtractSafariCookies() (*types.TwitterCookies, error) {
 	return extractSafari()
@@ -183,14 +178,4 @@ func ExtractChromeCookies(profileHint string) (*types.TwitterCookies, error) {
 // ExtractFirefoxCookies reads Twitter cookies from Firefox.
 func ExtractFirefoxCookies(profileHint string) (*types.TwitterCookies, error) {
 	return extractFirefox(profileHint)
-}
-
-// ExportedNormalizeCookieSources is the exported wrapper of normalizeCookieSources for testing.
-func ExportedNormalizeCookieSources(sources []string) ([]string, error) {
-	return normalizeCookieSources(sources)
-}
-
-// ExportedExtractFromBrowserOrder is the exported wrapper of extractFromBrowserOrder for testing.
-func ExportedExtractFromBrowserOrder(order []string, opts ResolveOptions) (*types.TwitterCookies, error) {
-	return extractFromBrowserOrder(order, opts)
 }

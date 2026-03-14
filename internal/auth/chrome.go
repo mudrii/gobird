@@ -89,7 +89,7 @@ func extractChromeWithContext(ctx context.Context, profileHint string) (result *
 		cookies = append(cookies, domainCookie{domain: host, name: name, value: val})
 	}
 	if rows.Err() != nil {
-		return nil, rows.Err()
+		return nil, fmt.Errorf("chrome: iterate cookies: %w", rows.Err())
 	}
 
 	authToken, ct0 := preferredDomainCookies(cookies)

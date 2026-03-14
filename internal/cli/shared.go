@@ -171,6 +171,7 @@ func currentFormatOptions() output.FormatOptions {
 func resolveQuoteDepthFromCommand() int {
 	cfg, err := config.Load(globalFlags.configPath)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to load config for quote depth: %v\n", err)
 		return 1
 	}
 	return resolveQuoteDepth(cfg)

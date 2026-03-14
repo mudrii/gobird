@@ -203,7 +203,7 @@ Twitter/X's private GraphQL uses operation-specific query IDs (`queryId` field i
 | `github.com/tailscale/hujson` | JSON5 parsing for config files (allows comments and trailing commas) |
 | `modernc.org/sqlite` | Pure-Go SQLite driver used by Firefox and Chrome cookie extractors to read browser cookie databases without requiring a system `libsqlite3` |
 | `github.com/google/uuid` | Generates `clientUUID` and `deviceID` on each client construction |
-| `github.com/mattn/go-isatty` | Detects whether stdout is a terminal (for color/emoji output decisions) |
+| `github.com/mattn/go-isatty` | Transitive dependency via `modernc.org/sqlite` (not directly used) |
 | `github.com/spf13/pflag` | Cobra dependency: POSIX-style flag parsing |
 | `golang.org/x/sys` | Required by `modernc.org/sqlite` for low-level OS calls |
 

@@ -15,7 +15,7 @@ func MapList(raw *types.WireList) *types.TwitterList {
 		Description:     raw.Description,
 		MemberCount:     raw.MemberCount,
 		SubscriberCount: raw.SubscriberCount,
-		IsPrivate:       raw.Mode == "private",
+		IsPrivate:       raw.Mode == "Private",
 		CreatedAt:       raw.CreatedAt,
 	}
 	if raw.UserResults.Result != nil && raw.UserResults.Result.Legacy != nil {
@@ -29,10 +29,3 @@ func MapList(raw *types.WireList) *types.TwitterList {
 	return l
 }
 
-// ParseListsFromInstructions collects normalized TwitterList items from timeline instructions.
-func ParseListsFromInstructions(instructions []types.WireTimelineInstruction) []types.TwitterList {
-	// Lists appear in a different response shape — handled directly by client/lists.go.
-	// This function is a placeholder for completeness.
-	_ = instructions
-	return nil
-}

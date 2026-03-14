@@ -153,12 +153,42 @@ func TestLoad_EnvOverride_InvalidNumber(t *testing.T) {
 	t.Setenv("BIRD_TIMEOUT_MS", "notanumber")
 	t.Setenv("BIRD_COOKIE_TIMEOUT_MS", "")
 	t.Setenv("BIRD_QUOTE_DEPTH", "")
-	cfg, err := config.Load(path)
-	if err != nil {
-		t.Fatalf("Load: %v", err)
+	if _, err := config.Load(path); err == nil {
+		t.Fatal("expected parse error for invalid BIRD_TIMEOUT_MS")
 	}
-	if cfg.TimeoutMs != 1000 {
-		t.Errorf("TimeoutMs: invalid env should not override, want 1000, got %d", cfg.TimeoutMs)
+}
+
+func TestLoad_EnvOverride_InvalidCookieTimeoutMS(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.json5")
+	if err := os.WriteFile(path, []byte(`{"timeoutMs":1000}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []string{"AUTH_TOKEN", "TWITTER_AUTH_TOKEN", "CT0", "TWITTER_CT0"} {
+		t.Setenv(e, "")
+	}
+	t.Setenv("BIRD_COOKIE_TIMEOUT_MS", "invalid")
+	t.Setenv("BIRD_TIMEOUT_MS", "")
+	t.Setenv("BIRD_QUOTE_DEPTH", "")
+	if _, err := config.Load(path); err == nil {
+		t.Fatal("expected parse error for invalid BIRD_COOKIE_TIMEOUT_MS")
+	}
+}
+
+func TestLoad_EnvOverride_InvalidQuoteDepth(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.json5")
+	if err := os.WriteFile(path, []byte(`{"timeoutMs":1000}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []string{"AUTH_TOKEN", "TWITTER_AUTH_TOKEN", "CT0", "TWITTER_CT0"} {
+		t.Setenv(e, "")
+	}
+	t.Setenv("BIRD_QUOTE_DEPTH", "not-int")
+	t.Setenv("BIRD_TIMEOUT_MS", "")
+	t.Setenv("BIRD_COOKIE_TIMEOUT_MS", "")
+	if _, err := config.Load(path); err == nil {
+		t.Fatal("expected parse error for invalid BIRD_QUOTE_DEPTH")
 	}
 }
 

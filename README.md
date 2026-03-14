@@ -1,6 +1,6 @@
 # gobird
 
-[![Go Version](https://img.shields.io/badge/go-1.23%2B-blue)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/go-1.24%2B-blue)](https://go.dev/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen)](#development)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 

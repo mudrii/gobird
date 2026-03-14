@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
 )
@@ -38,6 +39,7 @@ func loadFeatureOverrides() featureOverrideConfig {
 			return
 		}
 		if err := json.Unmarshal(payload, &featureOverrides); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to parse feature overrides: %v\n", err)
 			featureOverrides = featureOverrideConfig{}
 		}
 	})

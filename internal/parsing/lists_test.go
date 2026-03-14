@@ -53,7 +53,7 @@ func TestMapList_Basic(t *testing.T) {
 func TestMapList_Private(t *testing.T) {
 	raw := &types.WireList{
 		IDStr: "priv1",
-		Mode:  "private",
+		Mode:  "Private",
 	}
 	got := parsing.MapList(raw)
 	if got == nil {
@@ -115,11 +115,3 @@ func TestMapList_OwnerNilLegacy(t *testing.T) {
 	}
 }
 
-func TestParseListsFromInstructions_ReturnsNil(t *testing.T) {
-	result := parsing.ParseListsFromInstructions([]types.WireTimelineInstruction{
-		{Entries: []types.WireEntry{*makeTweetEntry("1")}},
-	})
-	if result != nil {
-		t.Errorf("ParseListsFromInstructions: want nil (placeholder), got %v", result)
-	}
-}

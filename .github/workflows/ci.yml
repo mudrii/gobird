@@ -14,11 +14,11 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.24"
           cache: true
 
-      - name: Tidy
-        run: go mod tidy
+      - name: Mod download
+        run: go mod download
 
       - name: Verify
         run: go mod verify
@@ -31,6 +31,8 @@ jobs:
 
       - name: Race
         run: go test -race ./...
+
+      - uses: golangci/golangci-lint-action@v6
 
       - name: Lint
         run: golangci-lint run

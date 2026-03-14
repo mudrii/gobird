@@ -19,7 +19,7 @@ func scrapeBody(ctx context.Context, client *http.Client, url string) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	body, readErr := io.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	closeErr := resp.Body.Close()
 	if readErr != nil {
 		return nil, readErr

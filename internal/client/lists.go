@@ -271,16 +271,6 @@ func parseListsFromInstructions(body []byte, includeRaw bool) (*types.ListPage, 
 	instructions := env.Data.User.Result.Timeline.Timeline.Instructions
 	var lists []types.TwitterList
 	seen := map[string]bool{}
-	for _, inst := range instructions {
-		for _, entry := range inst.Entries {
-			if entry.Content.ItemContent == nil {
-				continue
-			}
-			ic := entry.Content.ItemContent
-			// Lists are embedded as a special item type; try raw JSON path.
-			_ = ic
-		}
-	}
 	// Parse list items from raw JSON since WireItemContent doesn't have list_results.
 	var rawEnv struct {
 		Data struct {
