@@ -209,8 +209,9 @@ func newTestClientWith(baseURL string, queryCache map[string]string) *Client {
 		return http.DefaultTransport.RoundTrip(testReq)
 	})
 	c := New("fake-auth", "fake-ct0", &Options{
-		HTTPClient:   &http.Client{Transport: transport},
-		QueryIDCache: queryCache,
+		HTTPClient:        &http.Client{Transport: transport},
+		QueryIDCache:      queryCache,
+		RequestsPerSecond: -1,
 	})
 	c.scraper = func(_ context.Context) map[string]string { return nil }
 	return c

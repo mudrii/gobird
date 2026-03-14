@@ -5,8 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
+	isatty "github.com/mattn/go-isatty"
 	"github.com/mudrii/gobird/internal/client"
 	"github.com/mudrii/gobird/pkg/bird"
 	"github.com/spf13/cobra"
@@ -92,6 +94,9 @@ var globalFlags struct {
 	mediaFiles       []string
 	altTexts         []string
 	version          bool
+	quiet            bool
+	dryRun           bool
+	rateLimit        float64
 }
 
 // SetBuildInfo stores version and git SHA injected at link time.
@@ -109,6 +114,9 @@ func NewRootCmd() *cobra.Command {
 		SilenceErrors: true,
 		Args:          cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+			if !globalFlags.quiet && isatty.IsTerminal(os.Stderr.Fd()) {
+				fmt.Fprintln(os.Stderr, "WARNING: gobird uses X/Twitter's unofficial APIs. Use at your own risk. Your account may be suspended.")
+			}
 			if err := validateOutputFlags(); err != nil {
 				return err
 			}
@@ -148,6 +156,9 @@ func NewRootCmd() *cobra.Command {
 	pf.StringArrayVar(&globalFlags.mediaFiles, "media", nil, "media file path(s) to attach")
 	pf.StringArrayVar(&globalFlags.altTexts, "alt", nil, "alt text for the corresponding media file")
 	pf.BoolVar(&globalFlags.version, "version", false, "Print version information")
+	pf.BoolVarP(&globalFlags.quiet, "quiet", "q", false, "Suppress the startup warning")
+	pf.BoolVar(&globalFlags.dryRun, "dry-run", false, "Preview write operations without making API calls")
+	pf.Float64Var(&globalFlags.rateLimit, "rate-limit", 1.0, "Maximum requests per second")
 	_ = pf.MarkHidden("limit")
 
 	root.AddCommand(newVersionCmd())

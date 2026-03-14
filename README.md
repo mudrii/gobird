@@ -10,6 +10,22 @@ This project uses X/Twitter's unofficial private web APIs. It is intended for pe
 
 ---
 
+## Legal Disclaimer
+
+**This is an unofficial tool. It is not affiliated with, endorsed by, or connected to X Corp (formerly Twitter, Inc.) in any way.**
+
+gobird uses reverse-engineered, undocumented private APIs that are not intended for third-party use. Using this tool **violates the [X/Twitter Terms of Service](https://x.com/en/tos)**. By using gobird, you acknowledge and accept the following risks:
+
+- **Account suspension or permanent ban.** X Corp may suspend or terminate your account at any time for using unofficial API clients.
+- **Liquidated damages.** The X Terms of Service include a liquidated damages clause of $15,000 per million posts accessed through unauthorized means.
+- **No warranty.** This tool is provided as-is with no guarantees of functionality, accuracy, or continued operation. X can change or disable the underlying APIs at any time without notice.
+
+**You assume all risk associated with using this tool.** The authors and contributors accept no liability for any consequences arising from its use.
+
+gobird is a personal-use CLI tool intended for educational and research purposes only. See [DISCLAIMER.md](DISCLAIMER.md) for the full legal text.
+
+---
+
 ## Features
 
 - Post tweets and replies with optional media attachments (images, video, GIFs)
@@ -442,6 +458,31 @@ Use `--no-color` to disable ANSI colour while keeping emoji. Use `--no-emoji` to
 
 ---
 
+## Safety Flags
+
+gobird includes flags for safer operation:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dry-run` | `false` | Preview write operations (tweet, reply, follow, unfollow, unbookmark) without making API calls. The command prints what it would do and exits. |
+| `--rate-limit` | `1.0` | Maximum requests per second. Throttles paginated fetches to avoid triggering X's rate limits. Set to `0` to disable throttling. |
+| `--quiet` / `-q` | `false` | Suppress the startup ToS warning printed to stderr. |
+
+Examples:
+
+```sh
+# Preview a tweet without posting
+gobird tweet "Hello" --dry-run
+
+# Fetch home timeline at 0.5 requests/second
+gobird home -n 100 --rate-limit 0.5
+
+# Suppress the startup warning in scripts
+gobird whoami --quiet
+```
+
+---
+
 ## Environment Variables
 
 | Variable | Description |
@@ -506,6 +547,7 @@ go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 ## Open source project docs
 
 - [LICENSE](LICENSE)
+- [DISCLAIMER](DISCLAIMER.md)
 - [CHANGELOG](CHANGELOG.md)
 - [CONTRIBUTING](CONTRIBUTING.md)
 - [CODE OF CONDUCT](CODE_OF_CONDUCT.md)

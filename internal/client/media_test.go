@@ -196,7 +196,7 @@ func TestMediaFinalize_httpError(t *testing.T) {
 }
 
 func TestMediaPollStatus_failed(t *testing.T) {
-	c := New("tok", "ct0", &Options{HTTPClient: &http.Client{}})
+	c := New("tok", "ct0", &Options{HTTPClient: &http.Client{}, RequestsPerSecond: -1})
 	c.scraper = func(_ context.Context) map[string]string { return nil }
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -218,7 +218,7 @@ func TestMediaPollStatus_failed(t *testing.T) {
 }
 
 func TestMediaPollStatus_succeeded(t *testing.T) {
-	c := New("tok", "ct0", &Options{HTTPClient: &http.Client{}})
+	c := New("tok", "ct0", &Options{HTTPClient: &http.Client{}, RequestsPerSecond: -1})
 	c.scraper = func(_ context.Context) map[string]string { return nil }
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -237,7 +237,7 @@ func TestMediaPollStatus_succeeded(t *testing.T) {
 }
 
 func TestMediaPollStatus_noProcessingInfo(t *testing.T) {
-	c := New("tok", "ct0", &Options{HTTPClient: &http.Client{}})
+	c := New("tok", "ct0", &Options{HTTPClient: &http.Client{}, RequestsPerSecond: -1})
 	c.scraper = func(_ context.Context) map[string]string { return nil }
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -256,7 +256,7 @@ func TestMediaPollStatus_noProcessingInfo(t *testing.T) {
 }
 
 func TestMediaPollStatus_contextCancelled(t *testing.T) {
-	c := New("tok", "ct0", &Options{HTTPClient: &http.Client{}})
+	c := New("tok", "ct0", &Options{HTTPClient: &http.Client{}, RequestsPerSecond: -1})
 	c.scraper = func(_ context.Context) map[string]string { return nil }
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

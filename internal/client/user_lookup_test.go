@@ -166,5 +166,6 @@ func newURLTestClient(baseURL string) *Client {
 			"UserByScreenName":  "xc8f1g7BYqr6VTzTbvNlGw",
 			"AboutAccountQuery": "zs_jFPFT78rBpXv9Z3U2YQ",
 		},
+		RequestsPerSecond: -1,
 	})
 }

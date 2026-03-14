@@ -213,7 +213,7 @@ func (c *Client) paginateCursor(ctx context.Context, tweetID string, opts *types
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
-			case <-time.After(time.Duration(pageDelayMs) * time.Millisecond):
+			case <-time.After(time.Duration(pageDelayMs)*time.Millisecond + paginationJitter()):
 			}
 		}
 

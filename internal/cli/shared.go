@@ -53,9 +53,11 @@ func resolveClientDefault() (*client.Client, error) {
 		return nil, fmt.Errorf("resolve credentials: %w", err)
 	}
 
-	var clientOpts *client.Options
+	clientOpts := &client.Options{
+		RequestsPerSecond: globalFlags.rateLimit,
+	}
 	if timeoutMs := resolveTimeoutMs(cfg); timeoutMs > 0 {
-		clientOpts = &client.Options{TimeoutMs: timeoutMs}
+		clientOpts.TimeoutMs = timeoutMs
 	}
 	return client.New(creds.AuthToken, creds.Ct0, clientOpts), nil
 }

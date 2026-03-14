@@ -53,7 +53,7 @@ func (c *Client) fetchLists(ctx context.Context, operation string, userID string
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
-			case <-time.After(time.Duration(opts.PageDelayMs) * time.Millisecond):
+			case <-time.After(time.Duration(opts.PageDelayMs)*time.Millisecond + paginationJitter()):
 			}
 		}
 
@@ -149,7 +149,7 @@ func (c *Client) GetListTimeline(ctx context.Context, listID string, opts *types
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
-			case <-time.After(time.Duration(opts.PageDelayMs) * time.Millisecond):
+			case <-time.After(time.Duration(opts.PageDelayMs)*time.Millisecond + paginationJitter()):
 			}
 		}
 

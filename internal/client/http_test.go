@@ -34,7 +34,8 @@ func newBareTestClient(baseURL string) *Client {
 		return http.DefaultTransport.RoundTrip(testReq)
 	})
 	c := New("fake-auth", "fake-ct0", &Options{
-		HTTPClient: &http.Client{Transport: transport},
+		HTTPClient:        &http.Client{Transport: transport},
+		RequestsPerSecond: -1,
 	})
 	c.scraper = func(_ context.Context) map[string]string { return nil }
 	return c
@@ -97,6 +98,7 @@ func TestDo_CloseError(t *testing.T) {
 				}, nil
 			}),
 		},
+		RequestsPerSecond: -1,
 	})
 
 	_, err := c.doGET(context.Background(), "https://example.com/test", c.getJSONHeaders())
@@ -537,6 +539,7 @@ func TestFetchWithRetry_TransportErrorRetries(t *testing.T) {
 				}, nil
 			}),
 		},
+		RequestsPerSecond: -1,
 	})
 
 	body, err := c.fetchWithRetry(context.Background(), "https://example.com/data", c.getJSONHeaders())

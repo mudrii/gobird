@@ -46,7 +46,7 @@ func (c *Client) paginateFollowOp(ctx context.Context, operation string, userID 
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
-			case <-time.After(time.Duration(opts.PageDelayMs) * time.Millisecond):
+			case <-time.After(time.Duration(opts.PageDelayMs)*time.Millisecond + paginationJitter()):
 			}
 		}
 

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/mudrii/gobird/internal/output"
@@ -198,11 +199,15 @@ func newFollowCmd() *cobra.Command {
 		Short: "Follow a user",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			input := args[0]
+			if globalFlags.dryRun {
+				fmt.Fprintf(os.Stderr, "[dry-run] would follow %s\n", input)
+				return nil
+			}
 			c, err := quickClient()
 			if err != nil {
 				return err
 			}
-			input := args[0]
 			userID := input
 			label := input
 			if strings.HasPrefix(input, "@") {
@@ -228,11 +233,15 @@ func newUnfollowCmd() *cobra.Command {
 		Short: "Unfollow a user",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			input := args[0]
+			if globalFlags.dryRun {
+				fmt.Fprintf(os.Stderr, "[dry-run] would unfollow %s\n", input)
+				return nil
+			}
 			c, err := quickClient()
 			if err != nil {
 				return err
 			}
-			input := args[0]
 			userID := input
 			label := input
 			if strings.HasPrefix(input, "@") {

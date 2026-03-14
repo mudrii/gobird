@@ -61,7 +61,7 @@ func paginateInline(
 					Success: len(accumulated) > 0,
 					Error:   ctx.Err(),
 				}
-			case <-time.After(time.Duration(delayMs) * time.Millisecond):
+			case <-time.After(time.Duration(delayMs)*time.Millisecond + paginationJitter()):
 			}
 		}
 

@@ -96,6 +96,9 @@ These flags are accepted by every subcommand. They are declared as persistent fl
 | `--media` | | string array | `nil` | Media file path(s) to attach (tweet/reply only) |
 | `--alt` | | string array | `nil` | Alt text for each corresponding `--media` file |
 | `--version` | | bool | `false` | Print version and git SHA |
+| `--quiet` | `-q` | bool | `false` | Suppress the startup ToS warning |
+| `--dry-run` | | bool | `false` | Preview write operations without making API calls |
+| `--rate-limit` | | float64 | `1.0` | Maximum requests per second (0 = unlimited) |
 
 **Mutual exclusivity:** `--json`, `--json-full`, and `--plain` cannot be combined. Passing more than one returns exit code 2.
 

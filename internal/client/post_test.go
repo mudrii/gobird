@@ -17,6 +17,7 @@ func newTestClient(handler http.Handler) (*Client, *httptest.Server) {
 		QueryIDCache: map[string]string{
 			"CreateTweet": "testQueryID",
 		},
+		RequestsPerSecond: -1,
 	})
 	// Redirect all requests to the test server by using a custom transport.
 	c.httpClient = &http.Client{

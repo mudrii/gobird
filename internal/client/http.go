@@ -120,6 +120,7 @@ func (c *Client) doPOSTForm(ctx context.Context, url string, headers http.Header
 const maxResponseBytes = 100 * 1024 * 1024
 
 func (c *Client) do(req *http.Request) ([]byte, error) {
+	c.waitForRateLimit()
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%s %s: %w", req.Method, req.URL.Path, err)
@@ -160,6 +161,7 @@ func (c *Client) fetchWithRetry(ctx context.Context, url string, headers http.He
 				req.Header.Add(k, v)
 			}
 		}
+		c.waitForRateLimit()
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("%s %s: %w", req.Method, req.URL.Path, err)

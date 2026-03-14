@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/mudrii/gobird/internal/output"
 	"github.com/mudrii/gobird/internal/parsing"
@@ -19,6 +20,14 @@ func newTweetCmd() *cobra.Command {
 				return err
 			}
 			text := args[0]
+
+			if globalFlags.dryRun {
+				fmt.Fprintf(os.Stderr, "[dry-run] would post tweet: %q\n", text)
+				for _, m := range globalFlags.mediaFiles {
+					fmt.Fprintf(os.Stderr, "[dry-run] would attach media: %s\n", m)
+				}
+				return nil
+			}
 
 			c, err := resolveClient()
 			if err != nil {
@@ -59,6 +68,14 @@ func newReplyCmd() *cobra.Command {
 			tweetID := parsing.ExtractTweetID(input)
 			if tweetID == "" {
 				return fmt.Errorf("invalid tweet ID or URL: %q", input)
+			}
+
+			if globalFlags.dryRun {
+				fmt.Fprintf(os.Stderr, "[dry-run] would reply to %s: %q\n", tweetID, text)
+				for _, m := range globalFlags.mediaFiles {
+					fmt.Fprintf(os.Stderr, "[dry-run] would attach media: %s\n", m)
+				}
+				return nil
 			}
 
 			c, err := resolveClient()

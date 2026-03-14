@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/mudrii/gobird/internal/output"
 	"github.com/mudrii/gobird/internal/parsing"
@@ -63,13 +64,17 @@ func newUnbookmarkCmd() *cobra.Command {
 		Short: "Remove a tweet from bookmarks",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := quickClient()
-			if err != nil {
-				return err
-			}
 			tweetID := parsing.ExtractTweetID(args[0])
 			if tweetID == "" {
 				return fmt.Errorf("invalid tweet ID or URL: %q", args[0])
+			}
+			if globalFlags.dryRun {
+				fmt.Fprintf(os.Stderr, "[dry-run] would unbookmark tweet %s\n", tweetID)
+				return nil
+			}
+			c, err := quickClient()
+			if err != nil {
+				return err
 			}
 			if err := c.Unbookmark(cmd.Context(), tweetID); err != nil {
 				return err

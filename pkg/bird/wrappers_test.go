@@ -19,8 +19,9 @@ func newMockClient(t *testing.T, srv *httptest.Server, queryIDs map[string]strin
 	t.Helper()
 	httpClient := testutil.NewHTTPClientForServer(srv)
 	opts := &bird.ClientOptions{
-		HTTPClient:   httpClient,
-		QueryIDCache: queryIDs,
+		HTTPClient:        httpClient,
+		QueryIDCache:      queryIDs,
+		RequestsPerSecond: -1,
 	}
 	c, err := bird.NewWithTokens("fake-auth", "fake-ct0", opts)
 	if err != nil {

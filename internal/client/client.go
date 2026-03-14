@@ -2,6 +2,8 @@ package client
 
 import (
 	"context"
+	"crypto/rand"
+	"math/big"
 	"net/http"
 	"sync"
 	"time"
@@ -31,6 +33,12 @@ type Client struct {
 	userIDMu sync.RWMutex
 	userID   string
 
+	// rateMu guards lastRequest for the global rate limiter.
+	rateMu      sync.Mutex
+	lastRequest time.Time
+	// minInterval is the minimum duration between HTTP requests.
+	minInterval time.Duration
+
 	// scraper overrides scrapeQueryIDs for testing. If nil, the real scraper is used.
 	scraper func(ctx context.Context) map[string]string
 }
@@ -43,6 +51,9 @@ type Options struct {
 	QueryIDCache map[string]string
 	// TimeoutMs overrides the default HTTP timeout when HTTPClient is not supplied.
 	TimeoutMs int
+	// RequestsPerSecond sets the global rate limit. Default: 1.0 (one request per second).
+	// Set to 0 or negative to disable rate limiting.
+	RequestsPerSecond float64
 }
 
 // New creates a new Client with the given credentials.
@@ -55,6 +66,9 @@ func New(authToken, ct0 string, opts *Options) *Client {
 		clientUUID:   uuid.NewString(),
 		deviceID:     uuid.NewString(),
 	}
+
+	// Default rate limit: 1 request per second.
+	rps := 1.0
 	if opts != nil {
 		if opts.HTTPClient != nil {
 			c.httpClient = opts.HTTPClient
@@ -62,7 +76,16 @@ func New(authToken, ct0 string, opts *Options) *Client {
 		for k, v := range opts.QueryIDCache {
 			c.queryIDCache[k] = v
 		}
+		if opts.RequestsPerSecond > 0 {
+			rps = opts.RequestsPerSecond
+		} else if opts.RequestsPerSecond < 0 {
+			rps = 0
+		}
 	}
+	if rps > 0 {
+		c.minInterval = time.Duration(float64(time.Second) / rps)
+	}
+
 	if c.httpClient == nil {
 		timeout := 30 * time.Second
 		if opts != nil && opts.TimeoutMs > 0 {
@@ -96,6 +119,33 @@ func (c *Client) getBaseHeaders() http.Header {
 // Correction #70: upload uses base headers only.
 func (c *Client) getUploadHeaders() http.Header {
 	return uploadHeaders(c.authToken, c.ct0, c.clientUUID, c.deviceID, c.cachedUserID())
+}
+
+// waitForRateLimit enforces the global minimum interval between HTTP requests.
+// It sleeps for the remaining time if the last request was too recent.
+func (c *Client) waitForRateLimit() {
+	if c.minInterval <= 0 {
+		return
+	}
+	c.rateMu.Lock()
+	now := time.Now()
+	if !c.lastRequest.IsZero() {
+		elapsed := now.Sub(c.lastRequest)
+		if elapsed < c.minInterval {
+			time.Sleep(c.minInterval - elapsed)
+		}
+	}
+	c.lastRequest = time.Now()
+	c.rateMu.Unlock()
+}
+
+// paginationJitter returns a random duration between 50ms and 150ms.
+func paginationJitter() time.Duration {
+	n, err := rand.Int(rand.Reader, big.NewInt(101)) // [0, 100]
+	if err != nil {
+		return 100 * time.Millisecond
+	}
+	return time.Duration(50+n.Int64()) * time.Millisecond
 }
 
 // ensureClientUserID resolves and caches the authenticated user's numeric ID.
