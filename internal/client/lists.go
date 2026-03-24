@@ -109,6 +109,9 @@ func (c *Client) fetchListsPage(ctx context.Context, operation string, userID st
 		return nil, err
 	}
 
+	if len(queryIDs) == 0 {
+		return nil, fmt.Errorf("%s: no query IDs available", operation)
+	}
 	var lastErr error
 	for _, queryID := range queryIDs {
 		reqURL := fmt.Sprintf("%s/%s/%s?variables=%s&features=%s",
@@ -202,6 +205,9 @@ func (c *Client) fetchListTimelinePage(ctx context.Context, listID string, curso
 		return nil, err
 	}
 
+	if len(queryIDs) == 0 {
+		return nil, fmt.Errorf("ListLatestTweetsTimeline: no query IDs available for list %q", listID)
+	}
 	var lastErr error
 	for _, queryID := range queryIDs {
 		reqURL := fmt.Sprintf("%s/%s/ListLatestTweetsTimeline?variables=%s&features=%s",

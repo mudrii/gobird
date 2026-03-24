@@ -608,6 +608,47 @@ func TestExtractChromeWithContext_MissingCookies(t *testing.T) {
 	}
 }
 
+func TestIsUnderAllowedParent_ExactParent(t *testing.T) {
+	if isUnderAllowedParent("/a/b", []string{"/a/b"}) {
+		t.Error("exact parent path should return false (not a child)")
+	}
+}
+
+func TestIsUnderAllowedParent_DirectChild(t *testing.T) {
+	if !isUnderAllowedParent("/a/b/c", []string{"/a/b"}) {
+		t.Error("direct child path should return true")
+	}
+}
+
+func TestIsUnderAllowedParent_NoMatch(t *testing.T) {
+	if isUnderAllowedParent("/other/path", []string{"/a/b"}) {
+		t.Error("unrelated path should return false")
+	}
+}
+
+func TestChromeCookieCandidates_SqliteHint_OutsideAllowedDir(t *testing.T) {
+	home := "/fakehome"
+	got := chromeCookieCandidates(home, "/tmp/evil.sqlite")
+	for _, c := range got {
+		if strings.Contains(c, "/tmp/") {
+			t.Errorf("candidate should not include path outside allowed dirs: %q", c)
+		}
+	}
+}
+
+func TestChromeCookieCandidates_PathTraversal(t *testing.T) {
+	home := "/fakehome"
+	chromeDir := filepath.Join(home, "Library", "Application Support", "Google", "Chrome")
+	// Construct a hint that starts inside an allowed dir but traverses out via ".."
+	traversal := filepath.Join(chromeDir, "Default", "..", "..", "..", "..", "tmp", "evil.sqlite")
+	got := chromeCookieCandidates(home, traversal)
+	for _, c := range got {
+		if strings.Contains(c, "/tmp/") {
+			t.Errorf("path traversal hint should be rejected, got candidate: %q", c)
+		}
+	}
+}
+
 func TestExtractChromeWithContext_V11EncryptedWithHostHash(t *testing.T) {
 	password := "v11-hosthash-pw"
 	key := chromeCookieKeyFromPassword(password)

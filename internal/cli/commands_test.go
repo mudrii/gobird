@@ -231,3 +231,55 @@ func TestPersistentPreRunE_ZeroCount(t *testing.T) {
 		t.Fatalf("--count 0 should be valid: %v", err)
 	}
 }
+
+func TestSubcommands_NoLocalJsonFlag(t *testing.T) {
+	subcmds := []string{
+		"home", "bookmarks", "following", "followers", "likes",
+		"news", "trending", "lists", "list-timeline", "user-tweets",
+	}
+	for _, name := range subcmds {
+		t.Run(name, func(t *testing.T) {
+			root := cli.NewRootCmd()
+			sub, _, err := root.Find([]string{name})
+			if err != nil || sub == nil || sub.Name() != name {
+				t.Fatalf("subcommand %q not found", name)
+			}
+			if f := sub.Flags().Lookup("json"); f != nil {
+				t.Errorf("%s has a local --json flag; expected none (should be inherited from root)", name)
+			}
+		})
+	}
+}
+
+func TestSubcommands_NoLocalLimitFlag(t *testing.T) {
+	subcmds := []string{
+		"home", "bookmarks", "following", "followers", "likes",
+		"news", "trending", "lists", "list-timeline", "user-tweets",
+	}
+	for _, name := range subcmds {
+		t.Run(name, func(t *testing.T) {
+			root := cli.NewRootCmd()
+			sub, _, err := root.Find([]string{name})
+			if err != nil || sub == nil || sub.Name() != name {
+				t.Fatalf("subcommand %q not found", name)
+			}
+			if f := sub.Flags().Lookup("limit"); f != nil {
+				t.Errorf("%s has a local --limit flag; expected none (should be inherited from root)", name)
+			}
+		})
+	}
+}
+
+func TestSubcommands_JsonFlagIsInherited(t *testing.T) {
+	root := cli.NewRootCmd()
+	sub, _, err := root.Find([]string{"home"})
+	if err != nil || sub == nil || sub.Name() != "home" {
+		t.Fatal("home subcommand not found")
+	}
+	if f := sub.Flags().Lookup("json"); f != nil {
+		t.Error("home has a local --json flag; expected none")
+	}
+	if f := sub.InheritedFlags().Lookup("json"); f == nil {
+		t.Error("home does not inherit --json flag from root")
+	}
+}

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/mudrii/gobird/internal/testutil"
 )
@@ -628,5 +629,33 @@ func TestDoPOSTJSON_ContextCancelled(t *testing.T) {
 	_, err := c.doPOSTJSON(ctx, srv.URL+"/post", c.getJSONHeaders(), map[string]string{"k": "v"})
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
+	}
+}
+
+func TestRetryDelay_RetryAfterCappedAt60(t *testing.T) {
+	got := retryDelay(0, "120")
+	if got != 60*time.Second {
+		t.Errorf("retryDelay(0, \"120\") = %v, want %v", got, 60*time.Second)
+	}
+}
+
+func TestRetryDelay_RetryAfterExactly60(t *testing.T) {
+	got := retryDelay(0, "60")
+	if got != 60*time.Second {
+		t.Errorf("retryDelay(0, \"60\") = %v, want %v", got, 60*time.Second)
+	}
+}
+
+func TestRetryDelay_RetryAfterZeroFallsBackToBackoff(t *testing.T) {
+	got := retryDelay(0, "0")
+	if got >= time.Second {
+		t.Errorf("retryDelay(0, \"0\") = %v, want < 1s (backoff range)", got)
+	}
+}
+
+func TestRetryDelay_RetryAfterNegative(t *testing.T) {
+	got := retryDelay(0, "-5")
+	if got >= time.Second {
+		t.Errorf("retryDelay(0, \"-5\") = %v, want < 1s (backoff range, not negative)", got)
 	}
 }

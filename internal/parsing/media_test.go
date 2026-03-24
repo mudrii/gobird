@@ -239,3 +239,66 @@ func TestExtractMedia_MultipleItems(t *testing.T) {
 		t.Errorf("want 3 media items, got %d", len(media))
 	}
 }
+
+func TestBestVideoVariant_EqualBitratesKeepsFirst(t *testing.T) {
+	entities := &types.WireMediaEntities{
+		Media: []types.WireMedia{
+			{
+				Type:          "video",
+				MediaURLHttps: "https://example.com/thumb.jpg",
+				VideoInfo: &types.WireVideoInfo{
+					Variants: []types.WireVideoVariant{
+						{ContentType: "video/mp4", URL: "https://example.com/first.mp4", Bitrate: intPtr(2000000)},
+						{ContentType: "video/mp4", URL: "https://example.com/second.mp4", Bitrate: intPtr(2000000)},
+					},
+				},
+			},
+		},
+	}
+	media := parsing.ExtractMedia(entities)
+	if media[0].VideoURL != "https://example.com/first.mp4" {
+		t.Errorf("want first URL when bitrates are equal, got %q", media[0].VideoURL)
+	}
+}
+
+func TestBestVideoVariant_AllNilBitrates(t *testing.T) {
+	entities := &types.WireMediaEntities{
+		Media: []types.WireMedia{
+			{
+				Type:          "video",
+				MediaURLHttps: "https://example.com/thumb.jpg",
+				VideoInfo: &types.WireVideoInfo{
+					Variants: []types.WireVideoVariant{
+						{ContentType: "video/mp4", URL: "https://example.com/first.mp4"},
+						{ContentType: "video/mp4", URL: "https://example.com/second.mp4"},
+					},
+				},
+			},
+		},
+	}
+	media := parsing.ExtractMedia(entities)
+	if media[0].VideoURL != "https://example.com/first.mp4" {
+		t.Errorf("want first URL when all bitrates are nil, got %q", media[0].VideoURL)
+	}
+}
+
+func TestBestVideoVariant_NilVsNonNilBitrate(t *testing.T) {
+	entities := &types.WireMediaEntities{
+		Media: []types.WireMedia{
+			{
+				Type:          "video",
+				MediaURLHttps: "https://example.com/thumb.jpg",
+				VideoInfo: &types.WireVideoInfo{
+					Variants: []types.WireVideoVariant{
+						{ContentType: "video/mp4", URL: "https://example.com/nil-bitrate.mp4"},
+						{ContentType: "video/mp4", URL: "https://example.com/has-bitrate.mp4", Bitrate: intPtr(1000)},
+					},
+				},
+			},
+		},
+	}
+	media := parsing.ExtractMedia(entities)
+	if media[0].VideoURL != "https://example.com/has-bitrate.mp4" {
+		t.Errorf("want variant with non-nil bitrate, got %q", media[0].VideoURL)
+	}
+}

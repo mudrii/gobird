@@ -88,12 +88,8 @@ func (c *Client) fetchFollowPageWithRefresh(ctx context.Context, operation strin
 			had404 := is404(err)
 			return attemptResult{err: err, had404: had404}
 		}
-		pageBytes, marshalErr := json.Marshal(p)
-		if marshalErr != nil {
-			return attemptResult{err: marshalErr}
-		}
 		page = p
-		return attemptResult{body: pageBytes, success: true}
+		return attemptResult{success: true}
 	}
 
 	ar, refreshed := c.withRefreshedQueryIDsOn404(ctx, attempt)

@@ -202,3 +202,60 @@ func TestScrapeBody_Non2xx(t *testing.T) {
 		t.Fatalf("want HTTP 503 error, got %v", err)
 	}
 }
+
+func TestQueryIDFormatRe_Boundaries(t *testing.T) {
+	cases := []struct {
+		input string
+		valid bool
+	}{
+		{input: "aaaaaaaaaaaaaaaaaaa", valid: false},  // 19 chars — too short
+		{input: "aaaaaaaaaaaaaaaaaaaa", valid: true},   // 20 chars — minimum valid
+		{input: "abcdefghijklmnopqrstuvwxyzABCDEF012345678901234567890", valid: true}, // 50 mixed valid
+		{input: "aaaaaaaaaaaaaaaaaaaa!", valid: false}, // contains "!"
+		{input: "", valid: false},                      // empty
+		{input: "aaaaaaaaaaaaaaaaaaa a", valid: false}, // contains space
+	}
+	for _, tc := range cases {
+		got := queryIDFormatRe.MatchString(tc.input)
+		if got != tc.valid {
+			t.Errorf("queryIDFormatRe.MatchString(%q) = %v, want %v", tc.input, got, tc.valid)
+		}
+	}
+}
+
+func TestRefreshQueryIDs_RejectsMalformedScrapedIDs(t *testing.T) {
+	badIDs := map[string]string{
+		"TweetDetail":  "tooshort",           // under 20 chars
+		"CreateTweet":  "has a space in it!!!", // contains invalid chars
+		"UserTweets":   "",                    // empty
+	}
+	c := New("tok", "ct0", nil)
+	c.scraper = func(_ context.Context) map[string]string { return badIDs }
+
+	c.refreshQueryIDs(context.Background())
+
+	c.queryIDMu.RLock()
+	defer c.queryIDMu.RUnlock()
+	for op, bad := range badIDs {
+		if got, ok := c.queryIDCache[op]; ok && got == bad && bad != "" {
+			t.Errorf("queryIDCache[%q] = %q; malformed ID should have been rejected", op, got)
+		}
+	}
+}
+
+func TestRefreshQueryIDs_AcceptsValidScrapedIDs(t *testing.T) {
+	const validID = "ValidQueryID123456789"
+	c := New("tok", "ct0", nil)
+	c.scraper = func(_ context.Context) map[string]string {
+		return map[string]string{"TweetDetail": validID}
+	}
+
+	c.refreshQueryIDs(context.Background())
+
+	c.queryIDMu.RLock()
+	got := c.queryIDCache["TweetDetail"]
+	c.queryIDMu.RUnlock()
+	if got != validID {
+		t.Errorf("queryIDCache[TweetDetail] = %q, want %q", got, validID)
+	}
+}

@@ -296,6 +296,41 @@ func TestTypeAliases_Options(t *testing.T) {
 	}
 }
 
+func TestNewWithTokens_MalformedAuthToken(t *testing.T) {
+	validCt0 := "a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5"
+	c, err := bird.NewWithTokens("not-valid", validCt0, nil)
+	if err == nil {
+		t.Fatal("NewWithTokens() with malformed authToken should return error")
+	}
+	if c != nil {
+		t.Fatal("NewWithTokens() with malformed authToken should return nil client")
+	}
+	if !strings.Contains(err.Error(), "invalid credentials") {
+		t.Errorf("error should contain 'invalid credentials', got: %q", err.Error())
+	}
+}
+
+func TestNewWithTokens_MalformedCt0(t *testing.T) {
+	validAuthToken := "a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9"
+	c, err := bird.NewWithTokens(validAuthToken, "tooshort", nil)
+	if err == nil {
+		t.Fatal("NewWithTokens() with short ct0 should return error")
+	}
+	if c != nil {
+		t.Fatal("NewWithTokens() with short ct0 should return nil client")
+	}
+}
+
+func TestNewWithTokens_InvalidFormat_ErrorMessage(t *testing.T) {
+	_, err := bird.NewWithTokens("not-valid", "a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5", nil)
+	if err == nil {
+		t.Fatal("expected error for invalid authToken format")
+	}
+	if !strings.Contains(err.Error(), "invalid credentials") {
+		t.Errorf("error message should contain 'invalid credentials', got: %q", err.Error())
+	}
+}
+
 func TestTypeAliases_PageResultAndPaginatedResult(t *testing.T) {
 	var tp bird.TweetPage
 	tp.Success = true

@@ -331,3 +331,71 @@ func TestAddThreadMetadata_EmptyReplyToStatusID(t *testing.T) {
 		t.Errorf("tweet with empty InReplyToStatusID should be standalone, got %q", result[0].ThreadPosition)
 	}
 }
+
+func TestFilterAuthorChain_FirstTweetIsMiddle_WalksToRoot(t *testing.T) {
+	// Newest-first order: C replies to B, B replies to A, A is root. All alice.
+	tweets := []types.TweetData{
+		makeTweet("C", "alice", "B"),
+		makeTweet("B", "alice", "A"),
+		makeTweet("A", "alice", ""),
+	}
+	result := parsing.FilterAuthorChain(tweets, "alice")
+	if len(result) != 3 {
+		t.Fatalf("want 3 tweets (A, B, C), got %d", len(result))
+	}
+	ids := map[string]bool{}
+	for _, tw := range result {
+		ids[tw.ID] = true
+	}
+	for _, want := range []string{"A", "B", "C"} {
+		if !ids[want] {
+			t.Errorf("want tweet %q in result, not found", want)
+		}
+	}
+}
+
+func TestFilterAuthorChain_FirstTweetIsLeaf_MultiAuthor(t *testing.T) {
+	// D(alice)→C(alice)→B(bob). Walk stops at bob. Result = [C, D].
+	tweets := []types.TweetData{
+		makeTweet("D", "alice", "C"),
+		makeTweet("C", "alice", "B"),
+		makeTweet("B", "bob", ""),
+	}
+	result := parsing.FilterAuthorChain(tweets, "alice")
+	if len(result) != 2 {
+		t.Fatalf("want 2 tweets (C, D), got %d", len(result))
+	}
+	ids := map[string]bool{}
+	for _, tw := range result {
+		ids[tw.ID] = true
+	}
+	if !ids["C"] || !ids["D"] {
+		t.Errorf("want C and D in result, got %v", ids)
+	}
+	if ids["B"] {
+		t.Error("bob's tweet B should not be in result")
+	}
+}
+
+func TestFilterAuthorChain_NestedDifferentAuthorMiddle(t *testing.T) {
+	// C(alice)→B(alice)→A(bob). Root of alice chain = B. Result = [B, C].
+	tweets := []types.TweetData{
+		makeTweet("C", "alice", "B"),
+		makeTweet("B", "alice", "A"),
+		makeTweet("A", "bob", ""),
+	}
+	result := parsing.FilterAuthorChain(tweets, "alice")
+	if len(result) != 2 {
+		t.Fatalf("want 2 tweets (B, C), got %d", len(result))
+	}
+	ids := map[string]bool{}
+	for _, tw := range result {
+		ids[tw.ID] = true
+	}
+	if !ids["B"] || !ids["C"] {
+		t.Errorf("want B and C in result, got %v", ids)
+	}
+	if ids["A"] {
+		t.Error("bob's tweet A should not be in result")
+	}
+}

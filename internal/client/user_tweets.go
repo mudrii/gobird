@@ -118,6 +118,9 @@ func (c *Client) fetchUserTweetsPage(ctx context.Context, userID string, cursor 
 		return nil, err
 	}
 
+	if len(queryIDs) == 0 {
+		return nil, fmt.Errorf("UserTweets: no query IDs available for user %q", userID)
+	}
 	var lastErr error
 	for _, queryID := range queryIDs {
 		reqURL := fmt.Sprintf("%s/%s/UserTweets?variables=%s&features=%s&fieldToggles=%s",
