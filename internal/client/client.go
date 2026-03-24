@@ -123,18 +123,25 @@ func (c *Client) getUploadHeaders() http.Header {
 
 // waitForRateLimit enforces the global minimum interval between HTTP requests.
 // It sleeps for the remaining time if the last request was too recent.
+// The sleep is performed outside the mutex so concurrent callers are not blocked.
 func (c *Client) waitForRateLimit() {
 	if c.minInterval <= 0 {
 		return
 	}
 	c.rateMu.Lock()
-	now := time.Now()
+	var sleepFor time.Duration
 	if !c.lastRequest.IsZero() {
-		elapsed := now.Sub(c.lastRequest)
-		if elapsed < c.minInterval {
-			time.Sleep(c.minInterval - elapsed)
+		if elapsed := time.Since(c.lastRequest); elapsed < c.minInterval {
+			sleepFor = c.minInterval - elapsed
 		}
 	}
+	c.rateMu.Unlock()
+
+	if sleepFor > 0 {
+		time.Sleep(sleepFor)
+	}
+
+	c.rateMu.Lock()
 	c.lastRequest = time.Now()
 	c.rateMu.Unlock()
 }

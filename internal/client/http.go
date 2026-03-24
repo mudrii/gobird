@@ -16,10 +16,16 @@ import (
 
 func retryDelay(attempt int, retryAfter string) time.Duration {
 	const baseDelayMs = 500
+	const maxRetryAfterSecs = 60
 
 	if retryAfter != "" {
 		if secs, err := strconv.Atoi(retryAfter); err == nil {
-			return time.Duration(secs) * time.Second
+			if secs > maxRetryAfterSecs {
+				secs = maxRetryAfterSecs
+			}
+			if secs > 0 {
+				return time.Duration(secs) * time.Second
+			}
 		}
 	}
 

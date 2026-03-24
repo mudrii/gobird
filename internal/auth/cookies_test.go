@@ -185,9 +185,9 @@ func TestValidateCredentials(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateCredentials(tc.authToken, tc.ct0)
+			err := ValidateCredentials(tc.authToken, tc.ct0)
 			if (err != nil) != tc.wantErr {
-				t.Errorf("validateCredentials(%q, %q): err=%v, wantErr=%v", tc.authToken, tc.ct0, err, tc.wantErr)
+				t.Errorf("ValidateCredentials(%q, %q): err=%v, wantErr=%v", tc.authToken, tc.ct0, err, tc.wantErr)
 			}
 		})
 	}

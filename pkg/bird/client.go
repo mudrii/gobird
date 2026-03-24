@@ -1,6 +1,9 @@
 package bird
 
 import (
+	"fmt"
+
+	"github.com/mudrii/gobird/internal/auth"
 	"github.com/mudrii/gobird/internal/client"
 )
 
@@ -24,6 +27,9 @@ func New(creds *TwitterCookies, opts *ClientOptions) (*Client, error) {
 func NewWithTokens(authToken, ct0 string, opts *ClientOptions) (*Client, error) {
 	if authToken == "" || ct0 == "" {
 		return nil, errMissingCredentials
+	}
+	if err := auth.ValidateCredentials(authToken, ct0); err != nil {
+		return nil, fmt.Errorf("invalid credentials: %w", err)
 	}
 	return &Client{c: client.New(authToken, ct0, opts)}, nil
 }

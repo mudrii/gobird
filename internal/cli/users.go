@@ -12,8 +12,6 @@ import (
 
 func newFollowingCmd() *cobra.Command {
 	var userIDFlag string
-	var limit int
-	var asJSON bool
 
 	cmd := &cobra.Command{
 		Use:   "following",
@@ -37,12 +35,12 @@ func newFollowingCmd() *cobra.Command {
 				}
 				userID = u.ID
 			}
-			opts := &types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()}
+			opts := &types.FetchOptions{Limit: globalFlags.limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()}
 			result, err := c.GetFollowing(cmd.Context(), userID, opts)
 			if err != nil {
 				return err
 			}
-			if asJSON || globalFlags.jsonFull {
+			if globalFlags.jsonOutput || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
 			fmtOpts := currentFormatOptions()
@@ -56,16 +54,12 @@ func newFollowingCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&userIDFlag, "user", "", "Numeric Twitter user ID")
-	cmd.Flags().IntVar(&limit, "limit", 0, "Maximum number of users to fetch")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
 	return cmd
 }
 
 func newFollowersCmd() *cobra.Command {
 	var userIDFlag string
-	var limit int
-	var asJSON bool
 
 	cmd := &cobra.Command{
 		Use:   "followers",
@@ -89,12 +83,12 @@ func newFollowersCmd() *cobra.Command {
 				}
 				userID = u.ID
 			}
-			opts := &types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull}
+			opts := &types.FetchOptions{Limit: globalFlags.limit, IncludeRaw: globalFlags.jsonFull}
 			result, err := c.GetFollowers(cmd.Context(), userID, opts)
 			if err != nil {
 				return err
 			}
-			if asJSON || globalFlags.jsonFull {
+			if globalFlags.jsonOutput || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
 			fmtOpts := currentFormatOptions()
@@ -108,15 +102,11 @@ func newFollowersCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&userIDFlag, "user", "", "Numeric Twitter user ID")
-	cmd.Flags().IntVar(&limit, "limit", 0, "Maximum number of users to fetch")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
 	return cmd
 }
 
 func newLikesCmd() *cobra.Command {
-	var limit int
-	var asJSON bool
 
 	cmd := &cobra.Command{
 		Use:   "likes",
@@ -127,12 +117,12 @@ func newLikesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts := &types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull}
+			opts := &types.FetchOptions{Limit: globalFlags.limit, IncludeRaw: globalFlags.jsonFull}
 			result := c.GetLikes(cmd.Context(), opts)
 			if result.Error != nil {
 				return result.Error
 			}
-			if asJSON || globalFlags.jsonFull {
+			if globalFlags.jsonOutput || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
 			fmtOpts := currentFormatOptions()
@@ -144,9 +134,6 @@ func newLikesCmd() *cobra.Command {
 			return nil
 		},
 	}
-
-	cmd.Flags().IntVar(&limit, "limit", 0, "Maximum number of tweets to fetch")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
 	return cmd
 }

@@ -11,7 +11,6 @@ import (
 
 func newListsCmd() *cobra.Command {
 	var memberships bool
-	var asJSON bool
 
 	cmd := &cobra.Command{
 		Use:   "lists",
@@ -31,7 +30,7 @@ func newListsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if asJSON || globalFlags.jsonFull {
+			if globalFlags.jsonOutput || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
 			fmtOpts := currentFormatOptions()
@@ -45,14 +44,11 @@ func newListsCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&memberships, "memberships", false, "Show lists you are a member of")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
 	return cmd
 }
 
 func newListTimelineCmd() *cobra.Command {
-	var limit int
-	var asJSON bool
 
 	cmd := &cobra.Command{
 		Use:   "list-timeline <list-id-or-url>",
@@ -67,12 +63,12 @@ func newListTimelineCmd() *cobra.Command {
 			if listID == "" {
 				return fmt.Errorf("invalid list ID or URL: %q", args[0])
 			}
-			opts := &types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()}
+			opts := &types.FetchOptions{Limit: globalFlags.limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()}
 			result, err := c.GetListTimeline(cmd.Context(), listID, opts)
 			if err != nil {
 				return err
 			}
-			if asJSON || globalFlags.jsonFull {
+			if globalFlags.jsonOutput || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
 			fmtOpts := currentFormatOptions()
@@ -84,9 +80,6 @@ func newListTimelineCmd() *cobra.Command {
 			return nil
 		},
 	}
-
-	cmd.Flags().IntVar(&limit, "limit", 0, "Maximum number of tweets to fetch")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
 	return cmd
 }

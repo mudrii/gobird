@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// queryIDFormatRe validates scraped query IDs: 20+ alphanumeric/dash/underscore chars.
+var queryIDFormatRe = regexp.MustCompile(`^[A-Za-z0-9_-]{20,}$`)
+
 func scrapeBody(ctx context.Context, client *http.Client, url string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -98,7 +101,7 @@ func (c *Client) refreshQueryIDs(ctx context.Context) {
 		c.queryIDCache[op] = id
 	}
 	for op, id := range refreshed {
-		if id != "" {
+		if id != "" && queryIDFormatRe.MatchString(id) {
 			c.queryIDCache[op] = id
 		}
 	}

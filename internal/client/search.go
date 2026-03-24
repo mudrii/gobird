@@ -207,47 +207,44 @@ func (c *Client) GetAllSearchResults(ctx context.Context, q string, opts *types.
 	}
 
 	queryIDs := c.getQueryIDs("SearchTimeline")
-	refreshed := false
 
 	fetchFn := func(ctx context.Context, cursor string) inlinePageResult {
+		if len(queryIDs) == 0 {
+			return inlinePageResult{success: false, err: fmt.Errorf("no query IDs available for SearchTimeline")}
+		}
 		var lastErr error
-		for {
-			refreshedThisRound := false
-			for _, qid := range queryIDs {
-				result := c.searchPage(ctx, qid, q, cursor, count, product, opts.QuoteDepth, opts.IncludeRaw)
-				if result.success {
-					return result
-				}
-				lastErr = result.err
+		refreshedThisPage := false
+		for _, qid := range queryIDs {
+			result := c.searchPage(ctx, qid, q, cursor, count, product, opts.QuoteDepth, opts.IncludeRaw)
+			if result.success {
+				return result
+			}
+			lastErr = result.err
 
-				shouldRefresh := false
-				var he *httpError
-				if errors.As(lastErr, &he) {
-					if (he.StatusCode == 400 || he.StatusCode == 422) &&
-						strings.Contains(he.Body, "GRAPHQL_VALIDATION_FAILED") {
-						shouldRefresh = true
-					}
-				}
-				if !shouldRefresh && lastErr != nil &&
-					strings.Contains(lastErr.Error(), "GRAPHQL_VALIDATION_FAILED") {
+			shouldRefresh := false
+			var he *httpError
+			if errors.As(lastErr, &he) {
+				if (he.StatusCode == 400 || he.StatusCode == 422) &&
+					strings.Contains(he.Body, "GRAPHQL_VALIDATION_FAILED") {
 					shouldRefresh = true
-				}
-				if is404(lastErr) {
-					shouldRefresh = true
-				}
-
-				if shouldRefresh && !refreshed {
-					refreshed = true
-					refreshedThisRound = true
-					c.refreshQueryIDs(ctx)
-					queryIDs = c.getQueryIDs("SearchTimeline")
-					break
 				}
 			}
-			if !refreshedThisRound {
-				return inlinePageResult{success: false, err: lastErr}
+			if !shouldRefresh && lastErr != nil &&
+				strings.Contains(lastErr.Error(), "GRAPHQL_VALIDATION_FAILED") {
+				shouldRefresh = true
+			}
+			if is404(lastErr) {
+				shouldRefresh = true
+			}
+
+			if shouldRefresh && !refreshedThisPage {
+				refreshedThisPage = true
+				c.refreshQueryIDs(ctx)
+				queryIDs = c.getQueryIDs("SearchTimeline")
+				// Retry with refreshed IDs on next iteration.
 			}
 		}
+		return inlinePageResult{success: false, err: lastErr}
 	}
 
 	return paginateInline(ctx, opts.FetchOptions, 1000, fetchFn)

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -121,26 +120,9 @@ func (c *Client) mediaAppend(ctx context.Context, mediaID string, segmentIndex i
 	}
 	req.Header.Set("content-type", mw.FormDataContentType())
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	bodyCopyErr := func() error {
-		_, copyErr := io.Copy(io.Discard, resp.Body)
-		if copyErr != nil {
-			return fmt.Errorf("APPEND: drain body: %w", copyErr)
-		}
-		return nil
-	}()
-	closeErr := resp.Body.Close()
-	if bodyCopyErr != nil {
-		return bodyCopyErr
-	}
-	if closeErr != nil {
-		return fmt.Errorf("APPEND: close body: %w", closeErr)
-	}
-	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("APPEND: HTTP %d", resp.StatusCode)
+	_, doErr := c.do(req)
+	if doErr != nil {
+		return doErr
 	}
 	return nil
 }

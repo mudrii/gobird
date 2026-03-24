@@ -15,8 +15,6 @@ func quickClient() (*client.Client, error) {
 }
 
 func newHomeCmd() *cobra.Command {
-	var limit int
-	var asJSON bool
 	var latest bool
 
 	cmd := &cobra.Command{
@@ -28,7 +26,7 @@ func newHomeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts := &types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()}
+			opts := &types.FetchOptions{Limit: globalFlags.limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()}
 			var result types.TweetResult
 			if latest {
 				result = c.GetHomeLatestTimeline(cmd.Context(), opts)
@@ -38,7 +36,7 @@ func newHomeCmd() *cobra.Command {
 			if result.Error != nil {
 				return result.Error
 			}
-			if asJSON || globalFlags.jsonFull {
+			if globalFlags.jsonOutput || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
 			fmtOpts := currentFormatOptions()
@@ -51,8 +49,6 @@ func newHomeCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVar(&limit, "limit", 0, "Maximum number of tweets to fetch")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 	cmd.Flags().BoolVar(&latest, "latest", false, "Use latest (chronological) timeline")
 
 	return cmd

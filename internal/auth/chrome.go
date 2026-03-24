@@ -112,10 +112,20 @@ func extractChromeWithContext(ctx context.Context, profileHint string) (result *
 func chromeCookieCandidates(home, profileHint string) []string {
 	var candidates []string
 	if profileHint != "" {
+		allowedParents := []string{
+			filepath.Join(home, "Library", "Application Support", "Google", "Chrome"),
+			filepath.Join(home, "Library", "Application Support", "Chromium"),
+		}
 		if strings.HasSuffix(profileHint, ".sqlite") || strings.HasSuffix(profileHint, "Cookies") {
-			candidates = append(candidates, profileHint)
+			cleaned := filepath.Clean(profileHint)
+			if isUnderAllowedParent(cleaned, allowedParents) {
+				candidates = append(candidates, cleaned)
+			}
 		} else if strings.HasPrefix(profileHint, "/") {
-			candidates = append(candidates, filepath.Join(profileHint, "Cookies"))
+			cleaned := filepath.Clean(filepath.Join(profileHint, "Cookies"))
+			if isUnderAllowedParent(cleaned, allowedParents) {
+				candidates = append(candidates, cleaned)
+			}
 		} else {
 			candidates = append(candidates,
 				filepath.Join(home, "Library", "Application Support", "Google", "Chrome", profileHint, "Cookies"),
@@ -239,4 +249,13 @@ func pbkdf2SHA1(password, salt []byte, iter, keyLen int) []byte {
 		result = append(result, xored...)
 	}
 	return result[:keyLen]
+}
+
+func isUnderAllowedParent(path string, parents []string) bool {
+	for _, p := range parents {
+		if strings.HasPrefix(path, p+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }

@@ -10,8 +10,6 @@ import (
 )
 
 func newUserTweetsCmd() *cobra.Command {
-	var limit int
-	var asJSON bool
 
 	cmd := &cobra.Command{
 		Use:   "user-tweets <@handle>",
@@ -34,7 +32,7 @@ func newUserTweetsCmd() *cobra.Command {
 
 			result, err := c.GetUserTweets(cmd.Context(), userID, &types.UserTweetsOptions{
 				FetchOptions: types.FetchOptions{
-					Limit:      limit,
+					Limit:      globalFlags.limit,
 					IncludeRaw: globalFlags.jsonFull,
 					QuoteDepth: resolveQuoteDepthFromCommand(),
 				},
@@ -42,7 +40,7 @@ func newUserTweetsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if asJSON || globalFlags.jsonFull {
+			if globalFlags.jsonOutput || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
 			fmtOpts := currentFormatOptions()
@@ -55,8 +53,6 @@ func newUserTweetsCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVar(&limit, "limit", 0, "Maximum number of tweets to fetch")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
 	return cmd
 }

@@ -58,33 +58,34 @@ func FilterAuthorChain(tweets []types.TweetData, authorID string) []types.TweetD
 	}
 	byID := make(map[string]types.TweetData, len(tweets))
 	children := map[string][]types.TweetData{}
-	var anchor *types.TweetData
+	var firstAuthorTweet *types.TweetData
 	for _, t := range tweets {
 		byID[t.ID] = t
-		if t.AuthorID == authorID && anchor == nil {
+		if t.AuthorID == authorID && firstAuthorTweet == nil {
 			tmp := t
-			anchor = &tmp
+			firstAuthorTweet = &tmp
 		}
 		if t.InReplyToStatusID != nil && *t.InReplyToStatusID != "" {
 			children[*t.InReplyToStatusID] = append(children[*t.InReplyToStatusID], t)
 		}
 	}
-	if anchor == nil {
+	if firstAuthorTweet == nil {
 		return nil
 	}
 
-	chainIDs := map[string]bool{anchor.ID: true}
-	cur := *anchor
-	for cur.InReplyToStatusID != nil && *cur.InReplyToStatusID != "" {
-		parent, ok := byID[*cur.InReplyToStatusID]
+	// Walk from any author tweet to the root of the author's self-reply chain.
+	root := *firstAuthorTweet
+	for root.InReplyToStatusID != nil && *root.InReplyToStatusID != "" {
+		parent, ok := byID[*root.InReplyToStatusID]
 		if !ok || parent.AuthorID != authorID {
 			break
 		}
-		chainIDs[parent.ID] = true
-		cur = parent
+		root = parent
 	}
 
-	queue := []string{anchor.ID}
+	// BFS forward from root to collect all descendants by the same author.
+	chainIDs := map[string]bool{root.ID: true}
+	queue := []string{root.ID}
 	for len(queue) > 0 {
 		id := queue[0]
 		queue = queue[1:]

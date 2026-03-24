@@ -49,6 +49,18 @@ gobird is a personal-use CLI tool intended for educational and research purposes
 
 ## Installation
 
+### Homebrew
+
+```sh
+brew install mudrii/tap/gobird
+```
+
+To upgrade:
+
+```sh
+brew upgrade gobird
+```
+
 ### Release binaries
 
 Prebuilt binaries are published on the GitHub Releases page for supported platforms.
@@ -58,7 +70,7 @@ Prebuilt binaries are published on the GitHub Releases page for supported platfo
 3. Move `gobird` into a directory on your `PATH`, for example:
 
 ```sh
-tar -xzf gobird_26.03.15_darwin_arm64.tar.gz
+tar -xzf gobird_26.03.24_darwin_arm64.tar.gz
 install gobird /usr/local/bin/gobird
 gobird --version
 ```

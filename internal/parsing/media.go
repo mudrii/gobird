@@ -55,7 +55,7 @@ func bestVideoVariant(variants []types.WireVideoVariant) string {
 		if v.Bitrate != nil {
 			br = *v.Bitrate
 		}
-		if br >= bestBitrate {
+		if br > bestBitrate || best == "" {
 			bestBitrate = br
 			best = v.URL
 		}

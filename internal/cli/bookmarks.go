@@ -11,8 +11,6 @@ import (
 )
 
 func newBookmarksCmd() *cobra.Command {
-	var limit int
-	var asJSON bool
 	var folderID string
 
 	cmd := &cobra.Command{
@@ -27,18 +25,18 @@ func newBookmarksCmd() *cobra.Command {
 			var result types.TweetResult
 			if folderID != "" {
 				opts := &types.BookmarkFolderOptions{
-					FetchOptions: types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()},
+					FetchOptions: types.FetchOptions{Limit: globalFlags.limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()},
 					FolderID:     folderID,
 				}
 				result = c.GetBookmarkFolderTimeline(cmd.Context(), opts)
 			} else {
-				opts := &types.FetchOptions{Limit: limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()}
+				opts := &types.FetchOptions{Limit: globalFlags.limit, IncludeRaw: globalFlags.jsonFull, QuoteDepth: resolveQuoteDepthFromCommand()}
 				result = c.GetBookmarks(cmd.Context(), opts)
 			}
 			if result.Error != nil {
 				return result.Error
 			}
-			if asJSON || globalFlags.jsonFull {
+			if globalFlags.jsonOutput || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), result.Items)
 			}
 			fmtOpts := currentFormatOptions()
@@ -51,8 +49,6 @@ func newBookmarksCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVar(&limit, "limit", 0, "Maximum number of tweets to fetch")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 	cmd.Flags().StringVar(&folderID, "folder", "", "Bookmark folder ID")
 
 	return cmd

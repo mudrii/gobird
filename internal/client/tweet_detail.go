@@ -230,7 +230,7 @@ func (c *Client) paginateCursor(ctx context.Context, tweetID string, opts *types
 					NextCursor: cursor,
 				}, nil
 			}
-			return &types.TweetResult{Success: false, Error: err}, err
+			return nil, err
 		}
 
 		// Step 4: count page.

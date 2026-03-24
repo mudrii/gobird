@@ -12,8 +12,6 @@ import (
 
 func newNewsCmd() *cobra.Command {
 	var tabsFlag string
-	var limit int
-	var asJSON bool
 
 	cmd := &cobra.Command{
 		Use:   "news",
@@ -24,12 +22,12 @@ func newNewsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts := buildNewsOpts(tabsFlag, limit, client.DefaultNewsTabs, globalFlags.jsonFull)
+			opts := buildNewsOpts(tabsFlag, globalFlags.limit, client.DefaultNewsTabs, globalFlags.jsonFull)
 			items, err := c.GetNews(cmd.Context(), opts)
 			if err != nil {
 				return err
 			}
-			if asJSON || globalFlags.jsonFull {
+			if globalFlags.jsonOutput || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), items)
 			}
 			fmtOpts := currentFormatOptions()
@@ -43,15 +41,11 @@ func newNewsCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&tabsFlag, "tabs", "", "Comma-separated tab names (e.g. forYou,news)")
-	cmd.Flags().IntVar(&limit, "limit", 0, "Maximum number of items")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
 	return cmd
 }
 
 func newTrendingCmd() *cobra.Command {
-	var limit int
-	var asJSON bool
 
 	cmd := &cobra.Command{
 		Use:   "trending",
@@ -62,12 +56,12 @@ func newTrendingCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts := buildNewsOpts("trending", limit, nil, globalFlags.jsonFull)
+			opts := buildNewsOpts("trending", globalFlags.limit, nil, globalFlags.jsonFull)
 			items, err := c.GetNews(cmd.Context(), opts)
 			if err != nil {
 				return err
 			}
-			if asJSON || globalFlags.jsonFull {
+			if globalFlags.jsonOutput || globalFlags.jsonFull {
 				return output.PrintJSON(cmd.OutOrStdout(), items)
 			}
 			fmtOpts := currentFormatOptions()
@@ -79,9 +73,6 @@ func newTrendingCmd() *cobra.Command {
 			return nil
 		},
 	}
-
-	cmd.Flags().IntVar(&limit, "limit", 0, "Maximum number of items")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
 	return cmd
 }

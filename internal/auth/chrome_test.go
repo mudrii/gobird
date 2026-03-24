@@ -48,20 +48,35 @@ func TestChromeCookieCandidates_ProfileName(t *testing.T) {
 
 func TestChromeCookieCandidates_AbsolutePath(t *testing.T) {
 	home := "/fakehome"
+	// Absolute paths outside allowed Chrome/Chromium directories are rejected for security.
 	got := chromeCookieCandidates(home, "/custom/path/to/profile")
-	if got[0] != "/custom/path/to/profile/Cookies" {
-		t.Errorf("first candidate for abs path: got %q", got[0])
+	// Should only contain the default fallback candidates (no custom path).
+	for _, c := range got {
+		if strings.Contains(c, "/custom/") {
+			t.Errorf("should not include path outside allowed dirs: %q", c)
+		}
+	}
+	// Absolute path under the allowed Chrome dir should be accepted.
+	chromeProfile := filepath.Join(home, "Library", "Application Support", "Google", "Chrome", "MyProfile")
+	got2 := chromeCookieCandidates(home, chromeProfile)
+	if got2[0] != chromeProfile+"/Cookies" {
+		t.Errorf("first candidate for allowed abs path: got %q", got2[0])
 	}
 }
 
 func TestChromeCookieCandidates_DirectFile(t *testing.T) {
 	home := "/fakehome"
+	chromeDir := filepath.Join(home, "Library", "Application Support", "Google", "Chrome")
+
 	cases := []struct {
 		hint string
 		want string
 	}{
-		{"my.sqlite", "my.sqlite"},
-		{"/path/to/Cookies", "/path/to/Cookies"},
+		// Paths outside allowed dirs are rejected; only defaults remain.
+		{"my.sqlite", filepath.Join(chromeDir, "Default", "Cookies")},
+		{"/path/to/Cookies", filepath.Join(chromeDir, "Default", "Cookies")},
+		// Path under allowed dir is accepted.
+		{filepath.Join(chromeDir, "Profile 1", "Cookies"), filepath.Join(chromeDir, "Profile 1", "Cookies")},
 	}
 	for _, tc := range cases {
 		got := chromeCookieCandidates(home, tc.hint)
@@ -518,10 +533,10 @@ func TestExtractChromeWithContext_Integration(t *testing.T) {
 		chromeKeychainPasswordLookup = prevLookup
 	})
 
-	// Override UserHomeDir by using the env-based password and profile hint
-	// pointing directly to the DB file.
+	// Override HOME so os.UserHomeDir() returns our temp dir.
+	t.Setenv("HOME", dir)
 	t.Setenv(chromeSafeStoragePasswordEnv, password)
-	result, err := extractChromeWithContext(context.Background(), dbPath)
+	result, err := extractChromeWithContext(context.Background(), "")
 	if err != nil {
 		t.Fatalf("extractChromeWithContext: %v", err)
 	}
@@ -641,8 +656,9 @@ func TestExtractChromeWithContext_V11EncryptedWithHostHash(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	t.Setenv("HOME", dir)
 	t.Setenv(chromeSafeStoragePasswordEnv, password)
-	result, err := extractChromeWithContext(context.Background(), dbPath)
+	result, err := extractChromeWithContext(context.Background(), "")
 	if err != nil {
 		t.Fatalf("extractChromeWithContext: %v", err)
 	}

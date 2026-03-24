@@ -55,7 +55,7 @@ func TestNew_EmptyCt0(t *testing.T) {
 }
 
 func TestNewWithTokens_SetsCredentials(t *testing.T) {
-	c, err := bird.NewWithTokens("auth_token", "ct0_value", nil)
+	c, err := bird.NewWithTokens("a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9", "a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5", nil)
 	if err != nil {
 		t.Fatalf("NewWithTokens() with valid tokens: %v", err)
 	}
