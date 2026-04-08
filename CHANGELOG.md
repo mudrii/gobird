@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 Release versions use the `YY.MM.DD` format.
 
+## [26.04.08] - 2026-04-08
+
+### Changed
+- Project baseline raised to Go 1.26 with preferred toolchain `go1.26.2`
+- CI now validates the project with Go 1.26.2
+- Public and internal documentation were synchronized with the current client options, rate-limiter behavior, dependency graph, and query-ID refresh behavior
+
+### Fixed
+- Query ID refresh now preserves previously cached runtime IDs when a scrape returns nothing
+- Global request throttling now reserves request slots safely under concurrency and honors context cancellation
+- Inline pagination no longer incurs an extra delay after `MaxPages` is already reached
+- Removed dead config fields from the public config surface and aligned the docs with the supported settings
+- Applied low-risk Go 1.24+ modernizations across the codebase and normalized formatter drift
+
 ## [26.03.24] - 2026-03-24
 
 ### Added

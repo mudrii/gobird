@@ -70,7 +70,7 @@ Prebuilt binaries are published on the GitHub Releases page for supported platfo
 3. Move `gobird` into a directory on your `PATH`, for example:
 
 ```sh
-tar -xzf gobird_26.03.24_darwin_arm64.tar.gz
+tar -xzf gobird_26.04.08_darwin_arm64.tar.gz
 install gobird /usr/local/bin/gobird
 gobird --version
 ```
