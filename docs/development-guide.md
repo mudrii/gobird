@@ -2,12 +2,12 @@
 
 ## Prerequisites
 
-- **Go**: 1.24 or later (see `go.mod`)
+- **Go**: 1.26 or later (see `go.mod`; preferred toolchain is `go1.26.2`)
 - **golangci-lint**: for linting (`go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest` or via Homebrew)
 - **git**: for version injection into the binary
 - **macOS**: required for browser cookie extraction features (Chrome AES-CBC decryption via Keychain, Safari's WebKit cookie store, Firefox SQLite stores)
 
-No other tooling is required. The project uses only the Go standard library plus a small set of direct dependencies: `cobra`, `hujson`, `sqlite`, `uuid`.
+No other tooling is required. The project uses only the Go standard library plus a small set of direct dependencies: `cobra`, `go-isatty`, `hujson`, `sqlite`, `uuid`.
 
 ---
 

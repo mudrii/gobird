@@ -230,14 +230,16 @@ Always run `make test-race` (or `go test -race ./...`) before committing. The `C
 
 - `queryIDMu` (`sync.RWMutex`) guards `queryIDCache` and `queryIDRefreshAt`
 - `userIDMu` (`sync.RWMutex`) guards `userID`
+- `rateMu` (`sync.Mutex`) guards `nextRequestAt` for the global request throttle
 
 The race detector will catch any direct field access that bypasses these locks. The deliberate pattern is:
 
 - Read: `c.queryIDMu.RLock()` / `c.queryIDMu.RUnlock()`
 - Write: `c.queryIDMu.Lock()` / `c.queryIDMu.Unlock()`
 - For `userID` specifically: always use `c.cachedUserID()` for reads, never `c.userID` directly
+- For throttling specifically: never touch `c.nextRequestAt` outside `waitForRateLimit`
 
-The CI target `make ci` runs `vet`, `test`, `test-race`, and `build` in sequence.
+The CI target `make ci` runs `fmt-check`, `vet`, `test`, `test-race`, `lint`, and `build` in sequence.
 
 ---
 

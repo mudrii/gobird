@@ -31,7 +31,7 @@
 go get github.com/mudrii/gobird
 ```
 
-The minimum Go version is **1.24** (as declared in `go.mod`).
+The minimum Go version is **1.26** (as declared in `go.mod`).
 
 Import path:
 
@@ -144,6 +144,11 @@ type ClientOptions struct {
     // Ignored when HTTPClient is provided.
     // Default: 30000 (30 seconds).
     TimeoutMs int
+
+    // RequestsPerSecond sets the global client-side request throttle.
+    // Default: 1.0 (one request per second).
+    // Set to 0 or a negative value to disable throttling.
+    RequestsPerSecond float64
 }
 ```
 

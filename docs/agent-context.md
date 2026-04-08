@@ -260,7 +260,7 @@ One file per domain in `internal/client/`. Files are named after their primary c
 
 ## Mutex Discipline Rules
 
-The `Client` struct has two mutex-guarded fields:
+The `Client` struct has three mutex-guarded state groups:
 
 ```go
 type Client struct {
@@ -270,6 +270,10 @@ type Client struct {
 
     userIDMu sync.RWMutex
     userID   string
+
+    rateMu sync.Mutex
+    nextRequestAt time.Time
+    minInterval time.Duration
     // ...
 }
 ```
@@ -304,7 +308,9 @@ c.userIDMu.Unlock()
 
 **Rule 3: `refreshQueryIDs` holds `queryIDMu.Lock()` only during the map write, not during the scrape.** The scraper runs without any lock held.
 
-**Rule 4: Test code must inject `c.scraper`** to prevent the test from making real network calls during `refreshQueryIDs`:
+**Rule 4: Never read or write `c.nextRequestAt` outside `waitForRateLimit`.** Slot reservation and conditional rollback must happen under `rateMu` or the global throttle will become racy under concurrency.
+
+**Rule 5: Test code must inject `c.scraper`** to prevent the test from making real network calls during `refreshQueryIDs`:
 
 ```go
 c.scraper = func(_ context.Context) map[string]string { return nil }

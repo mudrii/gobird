@@ -204,7 +204,7 @@ Twitter/X's private GraphQL uses operation-specific query IDs (`queryId` field i
 | `github.com/tailscale/hujson` | JSON5 parsing for config files (allows comments and trailing commas) |
 | `modernc.org/sqlite` | Pure-Go SQLite driver used by Firefox and Chrome cookie extractors to read browser cookie databases without requiring a system `libsqlite3` |
 | `github.com/google/uuid` | Generates `clientUUID` and `deviceID` on each client construction |
-| `github.com/mattn/go-isatty` | Transitive dependency via `modernc.org/sqlite` (not directly used) |
+| `github.com/mattn/go-isatty` | Direct CLI dependency used to detect whether stderr is attached to a terminal before printing interactive warnings |
 | `github.com/spf13/pflag` | Cobra dependency: POSIX-style flag parsing |
 | `golang.org/x/sys` | Required by `modernc.org/sqlite` for low-level OS calls |
 
@@ -212,7 +212,7 @@ Twitter/X's private GraphQL uses operation-specific query IDs (`queryId` field i
 
 ## Concurrency Model
 
-The `internal/client.Client` struct contains three categories of shared state protected by separate mutexes:
+The `internal/client.Client` struct contains four categories of shared state protected by separate mutexes:
 
 ### Query ID cache (`queryIDMu sync.RWMutex`)
 
@@ -221,6 +221,10 @@ The `internal/client.Client` struct contains three categories of shared state pr
 ### User ID cache (`userIDMu sync.RWMutex`)
 
 `userID` (the authenticated account's numeric ID) is resolved lazily by `ensureClientUserID`. The fast path holds only a read lock. The slow path calls `getCurrentUser` without holding any lock (because `getCurrentUser` itself needs to read-lock `userIDMu` via `cachedUserID`), then acquires the write lock only to store the result. A double-checked pattern guards against redundant writes: if another goroutine resolved it first, the second write is a no-op. Only successful resolutions are cached; errors are not, allowing callers to retry.
+
+### Global rate limiter (`rateMu sync.Mutex`)
+
+`nextRequestAt` stores the next reserved request slot for the global request throttle. `waitForRateLimit` acquires `rateMu`, reserves a slot by moving `nextRequestAt` forward by `minInterval`, then releases the lock before sleeping. This guarantees that concurrent goroutines cannot claim the same request slot. If the waiting context is canceled before the delay elapses, `waitForRateLimit` reacquires `rateMu` and rolls the reservation back only when no later caller has already advanced the slot.
 
 ### Feature overrides (`featureOverridesOnce sync.Once`)
 

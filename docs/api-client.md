@@ -25,6 +25,10 @@ type Client struct {
     userIDMu sync.RWMutex  // Guards userID
     userID   string         // Cached numeric ID of the authenticated user (lazy)
 
+    rateMu sync.Mutex      // Guards nextRequestAt
+    nextRequestAt time.Time // Next reserved request slot for the global rate limiter
+    minInterval time.Duration // Minimum interval between requests when throttling is enabled
+
     scraper func(ctx context.Context) map[string]string  // Override scrapeQueryIDs in tests
 }
 ```
@@ -35,7 +39,7 @@ type Client struct {
 func New(authToken, ct0 string, opts *Options) *Client
 ```
 
-`Options.HTTPClient` replaces the default transport. `Options.QueryIDCache` seeds the runtime cache, useful in tests to inject known IDs. `Options.TimeoutMs` overrides the 30-second default only when `HTTPClient` is nil.
+`Options.HTTPClient` replaces the default transport. `Options.QueryIDCache` seeds the runtime cache, useful in tests to inject known IDs. `Options.TimeoutMs` overrides the 30-second default only when `HTTPClient` is nil. `Options.RequestsPerSecond` configures the global client-side throttle; the default is `1.0`, and `0` or a negative value disables throttling.
 
 Both `clientUUID` and `deviceID` are freshly generated per-instance with `uuid.NewString()`. This mimics the browser's per-session random identifiers that X uses to correlate requests.
 
@@ -137,10 +141,10 @@ Steps:
 3. Deduplicates script URLs across pages.
 4. For each unseen script URL, fetches the JS bundle content.
 5. For each operation in `FallbackQueryIDs`, applies a pre-compiled regex `([A-Za-z0-9_-]{20,})/<OperationName>\b` to extract the query ID from bundle text.
-6. Writes results to `queryIDCache` under `queryIDMu.Lock()`.
-7. Also seeds `BundledBaselineQueryIDs` entries into the cache so they are present for fast-path reads.
+6. Under `queryIDMu.Lock()`, builds a merged map seeded from `BundledBaselineQueryIDs`, then overlays the existing runtime cache so previously scraped IDs are preserved.
+7. Overlays any newly scraped IDs that are non-empty and pass the query-ID format check.
 
-Errors (network failures, script fetch failures) are silently ignored. Whatever IDs were found are stored. The refresh timestamp is updated via `queryIDRefreshAt`.
+Errors (network failures, script fetch failures) are silently ignored. A scrape that finds nothing still preserves the previous runtime cache contents; the refresh timestamp is updated via `queryIDRefreshAt`.
 
 The `c.scraper` field allows tests to inject a replacement function instead of hitting the real X.com.
 
@@ -438,7 +442,8 @@ getQueryIDs(operation)
 refreshQueryIDs(ctx)
   ├── Run scraper (real or injected test stub)
   ├── Lock queryIDMu.Lock()
-  ├── Seed BundledBaselineQueryIDs into cache
-  ├── Merge scraped IDs (non-empty only) into cache
+  ├── Seed BundledBaselineQueryIDs into a fresh map
+  ├── Merge existing runtime cache into that map
+  ├── Merge scraped IDs (non-empty, format-validated) into that map
   └── Record queryIDRefreshAt = time.Now()
 ```

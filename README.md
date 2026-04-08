@@ -1,6 +1,6 @@
 # gobird
 
-[![Go Version](https://img.shields.io/badge/go-1.24%2B-blue)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/go-1.26%2B-blue)](https://go.dev/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen)](#development)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -192,7 +192,7 @@ To find your cookies manually: open x.com, open DevTools → Application → Coo
 ```sh
 $ gobird read 1867654321098765432
 @golang (The Go Programming Language) [Mon Dec 16 14:22:01 +0000 2024]
-Go 1.24 is out! Download it at https://go.dev/dl
+Download the latest Go release at https://go.dev/dl
 replies:142 retweets:893 likes:4201
 ```
 
@@ -215,7 +215,7 @@ $ gobird reply 1867654321098765432 "Great news!"
 ```sh
 $ gobird search "golang generics" -n 5
 @GopherAcademy (Gopher Academy) [Tue Dec 17 09:11:22 +0000 2024]
-Generics in Go 1.24: what changed and what didn't
+Generics in modern Go: what changed and what didn't
 replies:8 retweets:37 likes:204
 ---
 @go_trending (Go Trending) [Tue Dec 17 08:55:01 +0000 2024]
@@ -288,7 +288,7 @@ $ gobird news --tabs forYou,news
 $ gobird read 1867654321098765432 --json
 {
   "id": "1867654321098765432",
-  "text": "Go 1.24 is out! ...",
+  "text": "Download the latest Go release at https://go.dev/dl",
   "author": { "username": "golang", "name": "The Go Programming Language" },
   "likeCount": 4201
 }
@@ -512,7 +512,7 @@ gobird whoami --quiet
 
 ## Requirements
 
-- Go 1.24 or later (module currently declares `go 1.24.0`)
+- Go 1.26 or later (module currently declares `go 1.26.0` and prefers toolchain `go1.26.2`)
 - macOS or Linux
 - For browser cookie extraction: Safari, Chrome / Chromium, or Firefox must be installed and logged in to x.com
 
