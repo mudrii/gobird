@@ -273,5 +273,5 @@ Exit codes:
 ```
 
 Errors are never silently swallowed except in two documented places:
-- `refreshQueryIDs` silently ignores scraping errors to preserve availability (the old IDs remain in cache).
+- `refreshQueryIDs` silently ignores scraping errors to preserve availability (previously cached runtime IDs remain in cache, with bundled IDs filling any missing keys).
 - `scrapeQueryIDs` silently skips individual page or JS bundle fetch failures and returns whatever was found.

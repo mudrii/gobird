@@ -118,8 +118,6 @@ Complete field reference with types, defaults, and corresponding environment var
 | CookieTimeoutMs | `cookieTimeoutMs` | `int` | `0` | `BIRD_COOKIE_TIMEOUT_MS` | Cookie extraction timeout in milliseconds (0 = unlimited) |
 | TimeoutMs | `timeoutMs` | `int` | `0` (→ 30000) | `BIRD_TIMEOUT_MS` | HTTP request timeout in milliseconds (0 = 30000 default) |
 | QuoteDepth | `quoteDepth` | `*int` | `1` | `BIRD_QUOTE_DEPTH` | Quoted tweet expansion depth (nil = default 1, explicit 0 disables) |
-| QueryIDCachePath | `queryIdCachePath` | `string` | `""` | — | Override path for the on-disk query ID cache |
-| FeatureOverridesPath | `featureOverridesPath` | `string` | `""` | — | Path to a feature flag overrides JSON file |
 
 ### Field details
 
@@ -246,16 +244,6 @@ How many levels deep to recursively fetch quoted tweets. The default after apply
   "quoteDepth": 0
 }
 ```
-
-#### `queryIdCachePath`
-
-The internal client caches runtime-scraped GraphQL query IDs to a file. This field overrides where that file is stored. Rarely needed.
-
-#### `featureOverridesPath`
-
-Path to a JSON file containing feature flag overrides. See the [Feature Flag Override System](#feature-flag-override-system) section.
-
----
 
 ## Environment Variable Overrides
 

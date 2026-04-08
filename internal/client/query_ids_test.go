@@ -208,12 +208,12 @@ func TestQueryIDFormatRe_Boundaries(t *testing.T) {
 		input string
 		valid bool
 	}{
-		{input: "aaaaaaaaaaaaaaaaaaa", valid: false},  // 19 chars — too short
-		{input: "aaaaaaaaaaaaaaaaaaaa", valid: true},   // 20 chars — minimum valid
+		{input: "aaaaaaaaaaaaaaaaaaa", valid: false},                                  // 19 chars — too short
+		{input: "aaaaaaaaaaaaaaaaaaaa", valid: true},                                  // 20 chars — minimum valid
 		{input: "abcdefghijklmnopqrstuvwxyzABCDEF012345678901234567890", valid: true}, // 50 mixed valid
-		{input: "aaaaaaaaaaaaaaaaaaaa!", valid: false}, // contains "!"
-		{input: "", valid: false},                      // empty
-		{input: "aaaaaaaaaaaaaaaaaaa a", valid: false}, // contains space
+		{input: "aaaaaaaaaaaaaaaaaaaa!", valid: false},                                // contains "!"
+		{input: "", valid: false},                                                     // empty
+		{input: "aaaaaaaaaaaaaaaaaaa a", valid: false},                                // contains space
 	}
 	for _, tc := range cases {
 		got := queryIDFormatRe.MatchString(tc.input)
@@ -225,9 +225,9 @@ func TestQueryIDFormatRe_Boundaries(t *testing.T) {
 
 func TestRefreshQueryIDs_RejectsMalformedScrapedIDs(t *testing.T) {
 	badIDs := map[string]string{
-		"TweetDetail":  "tooshort",           // under 20 chars
-		"CreateTweet":  "has a space in it!!!", // contains invalid chars
-		"UserTweets":   "",                    // empty
+		"TweetDetail": "tooshort",             // under 20 chars
+		"CreateTweet": "has a space in it!!!", // contains invalid chars
+		"UserTweets":  "",                     // empty
 	}
 	c := New("tok", "ct0", nil)
 	c.scraper = func(_ context.Context) map[string]string { return badIDs }
@@ -257,5 +257,22 @@ func TestRefreshQueryIDs_AcceptsValidScrapedIDs(t *testing.T) {
 	c.queryIDMu.RUnlock()
 	if got != validID {
 		t.Errorf("queryIDCache[TweetDetail] = %q, want %q", got, validID)
+	}
+}
+
+func TestRefreshQueryIDs_PreservesExistingRuntimeIDsWhenScrapeReturnsNone(t *testing.T) {
+	const cachedID = "CachedRuntimeQueryID12345"
+	c := New("tok", "ct0", &Options{
+		QueryIDCache: map[string]string{"TweetDetail": cachedID},
+	})
+	c.scraper = func(_ context.Context) map[string]string { return nil }
+
+	c.refreshQueryIDs(context.Background())
+
+	c.queryIDMu.RLock()
+	got := c.queryIDCache["TweetDetail"]
+	c.queryIDMu.RUnlock()
+	if got != cachedID {
+		t.Fatalf("queryIDCache[TweetDetail] = %q, want preserved runtime ID %q", got, cachedID)
 	}
 }

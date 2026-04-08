@@ -97,7 +97,7 @@ make build
 `gobird` works without a config file if you pass credentials with flags, environment variables, or browser extraction. For a persistent setup, create a JSON5 config file at one of these locations:
 
 - `~/.config/gobird/config.json5`
-- `~/.gobirdrc.json5`
+- `./.gobirdrc.json5`
 
 Minimal example:
 
@@ -105,8 +105,7 @@ Minimal example:
 {
   authToken: "your-auth-token",
   ct0: "your-ct0-token",
-  browser: "safari",
-  output: "human"
+  defaultBrowser: "safari"
 }
 ```
 

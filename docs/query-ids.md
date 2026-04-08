@@ -278,7 +278,7 @@ Request with current ID
 Key properties:
 - Refresh is performed at most once per top-level operation call
 - The runtime cache is shared across all goroutines (mutex-protected)
-- After refresh, the cache contains the union of scraped IDs and `BundledBaselineQueryIDs`
+- After refresh, the cache contains the union of previously cached runtime IDs, scraped IDs, and `BundledBaselineQueryIDs`
 - `FallbackQueryIDs` are NOT written into the cache by refresh — they remain as the last-resort tier only
 
 ---

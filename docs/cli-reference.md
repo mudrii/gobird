@@ -216,12 +216,6 @@ BIRD_CONFIG=/path/to/myconfig.json5 gobird home
 
   // Tweet display.
   "quoteDepth": 1,          // int: quoted tweet expansion depth (default: 1)
-
-  // Advanced: override where query IDs are cached on disk.
-  "queryIdCachePath": "",   // string: path to query ID cache file
-
-  // Advanced: override feature flag values (see Feature Flag Overrides section).
-  "featureOverridesPath": "", // string: path to feature overrides JSON file
 }
 ```
 

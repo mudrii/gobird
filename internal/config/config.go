@@ -62,10 +62,6 @@ type Config struct {
 	// QuoteDepth controls quoted tweet expansion depth.
 	// Uses pointer to distinguish "not set" (nil) from "explicitly 0".
 	QuoteDepth *int `json:"quoteDepth"`
-	// QueryIDCachePath overrides the default query ID cache file location.
-	QueryIDCachePath string `json:"queryIdCachePath"`
-	// FeatureOverridesPath overrides the default features JSON path.
-	FeatureOverridesPath string `json:"featureOverridesPath"`
 }
 
 // Load reads and parses the gobird config files, applying env var overrides.

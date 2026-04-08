@@ -476,7 +476,7 @@ var PerOperationFallbackIDs = map[string][]string{
 
 1. Calls the scraper (real or injected) to fetch fresh IDs from x.com JS bundles
 2. Acquires `queryIDMu.Lock()`
-3. Seeds the cache with `BundledBaselineQueryIDs` first (so bundled IDs are always present)
+3. Merges `BundledBaselineQueryIDs` with the existing runtime cache (so bundled IDs fill gaps without discarding previously scraped IDs)
 4. Overlays scraped IDs on top (scraped IDs win if non-empty)
 5. Updates `queryIDRefreshAt`
 6. Releases the lock

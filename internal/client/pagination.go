@@ -52,6 +52,11 @@ func paginateInline(
 	limit := opts.Limit
 
 	for page := 0; ; page++ {
+		// Stop if maxPages reached.
+		if maxPages > 0 && page >= maxPages {
+			break
+		}
+
 		// Apply delay before fetch, skip page 0 (correction #9).
 		if page > 0 && delayMs > 0 {
 			select {
@@ -63,11 +68,6 @@ func paginateInline(
 				}
 			case <-time.After(time.Duration(delayMs)*time.Millisecond + paginationJitter()):
 			}
-		}
-
-		// Stop if maxPages reached.
-		if maxPages > 0 && page >= maxPages {
-			break
 		}
 
 		result := fetch(ctx, cursor)

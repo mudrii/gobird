@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/mudrii/gobird/internal/testutil"
 	"github.com/mudrii/gobird/internal/types"
@@ -100,6 +101,30 @@ func TestPaginateInline_StopsOnEmptyTweets(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Errorf("expected 1 call (stopped on empty tweets), got %d", calls)
+	}
+}
+
+func TestPaginateInline_DoesNotDelayAfterMaxPagesReached(t *testing.T) {
+	start := time.Now()
+	calls := 0
+	fetch := func(_ context.Context, cursor string) inlinePageResult {
+		calls++
+		return inlinePageResult{
+			tweets:     []types.TweetData{makeTweet("1")},
+			nextCursor: "next",
+			success:    true,
+		}
+	}
+
+	result := paginateInline(context.Background(), types.FetchOptions{MaxPages: 1}, 200, fetch)
+	if !result.Success {
+		t.Fatalf("expected success, got error: %v", result.Error)
+	}
+	if calls != 1 {
+		t.Fatalf("expected 1 fetch call, got %d", calls)
+	}
+	if elapsed := time.Since(start); elapsed >= 100*time.Millisecond {
+		t.Fatalf("paginateInline should not wait after the last page, got elapsed %v", elapsed)
 	}
 }
 

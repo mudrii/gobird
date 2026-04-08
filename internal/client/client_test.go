@@ -1,7 +1,10 @@
 package client
 
 import (
+	"context"
+	"errors"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 )
@@ -138,5 +141,85 @@ func TestNew_emptyQueryIDCache(t *testing.T) {
 	c := New("a", "b", &Options{QueryIDCache: map[string]string{}})
 	if len(c.queryIDCache) != 0 {
 		t.Errorf("empty seed should result in empty cache, got %d entries", len(c.queryIDCache))
+	}
+}
+
+func TestWaitForRateLimit_ConcurrentReservationsAreSerialized(t *testing.T) {
+	c := New("a", "b", &Options{RequestsPerSecond: 40})
+	start := make(chan struct{})
+	times := make(chan time.Time, 2)
+	errs := make(chan error, 2)
+	var wg sync.WaitGroup
+
+	for range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			errs <- c.waitForRateLimit(context.Background())
+			times <- time.Now()
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+	close(errs)
+	close(times)
+
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("waitForRateLimit: unexpected error: %v", err)
+		}
+	}
+
+	got := make([]time.Time, 0, 2)
+	for ts := range times {
+		got = append(got, ts)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 timestamps, got %d", len(got))
+	}
+
+	diff := got[0].Sub(got[1])
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff < 20*time.Millisecond {
+		t.Fatalf("concurrent reservations should be noticeably separated, got %v", diff)
+	}
+}
+
+func TestWaitForRateLimit_HonorsContextCancellation(t *testing.T) {
+	c := New("a", "b", &Options{RequestsPerSecond: 1})
+	if err := c.waitForRateLimit(context.Background()); err != nil {
+		t.Fatalf("first waitForRateLimit: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := c.waitForRateLimit(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("waitForRateLimit with canceled context = %v, want %v", err, context.Canceled)
+	}
+}
+
+func TestWaitForRateLimit_CanceledWaitDoesNotConsumeExtraSlot(t *testing.T) {
+	c := New("a", "b", &Options{RequestsPerSecond: 40})
+	if err := c.waitForRateLimit(context.Background()); err != nil {
+		t.Fatalf("first waitForRateLimit: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := c.waitForRateLimit(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("waitForRateLimit with canceled context = %v, want %v", err, context.Canceled)
+	}
+
+	start := time.Now()
+	if err := c.waitForRateLimit(context.Background()); err != nil {
+		t.Fatalf("third waitForRateLimit: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 60*time.Millisecond {
+		t.Fatalf("canceled wait should not consume an extra slot, got elapsed %v", elapsed)
 	}
 }

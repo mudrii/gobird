@@ -95,9 +95,7 @@ func TestLoad_AllFields(t *testing.T) {
 		"cookieSource": ["safari", "chrome"],
 		"cookieTimeoutMs": 5000,
 		"timeoutMs": 10000,
-		"quoteDepth": 3,
-		"queryIdCachePath": "/tmp/ids.json",
-		"featureOverridesPath": "/tmp/features.json"
+		"quoteDepth": 3
 	}`
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
@@ -132,12 +130,6 @@ func TestLoad_AllFields(t *testing.T) {
 	}
 	if cfg.QuoteDepth == nil || *cfg.QuoteDepth != 3 {
 		t.Errorf("QuoteDepth: want 3, got %v", cfg.QuoteDepth)
-	}
-	if cfg.QueryIDCachePath != "/tmp/ids.json" {
-		t.Errorf("QueryIDCachePath: want %q, got %q", "/tmp/ids.json", cfg.QueryIDCachePath)
-	}
-	if cfg.FeatureOverridesPath != "/tmp/features.json" {
-		t.Errorf("FeatureOverridesPath: want %q, got %q", "/tmp/features.json", cfg.FeatureOverridesPath)
 	}
 }
 

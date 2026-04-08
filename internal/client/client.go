@@ -33,9 +33,10 @@ type Client struct {
 	userIDMu sync.RWMutex
 	userID   string
 
-	// rateMu guards lastRequest for the global rate limiter.
-	rateMu      sync.Mutex
-	lastRequest time.Time
+	// rateMu guards nextRequestAt for the global rate limiter.
+	rateMu sync.Mutex
+	// nextRequestAt is the next reserved request slot.
+	nextRequestAt time.Time
 	// minInterval is the minimum duration between HTTP requests.
 	minInterval time.Duration
 
@@ -121,29 +122,40 @@ func (c *Client) getUploadHeaders() http.Header {
 	return uploadHeaders(c.authToken, c.ct0, c.clientUUID, c.deviceID, c.cachedUserID())
 }
 
-// waitForRateLimit enforces the global minimum interval between HTTP requests.
-// It sleeps for the remaining time if the last request was too recent.
-// The sleep is performed outside the mutex so concurrent callers are not blocked.
-func (c *Client) waitForRateLimit() {
+// waitForRateLimit reserves the next request slot and waits until it is due.
+// Reservation happens under the mutex so concurrent callers cannot claim the
+// same slot. The wait itself is context-aware and happens outside the lock.
+func (c *Client) waitForRateLimit(ctx context.Context) error {
 	if c.minInterval <= 0 {
-		return
+		return nil
 	}
+
 	c.rateMu.Lock()
-	var sleepFor time.Duration
-	if !c.lastRequest.IsZero() {
-		if elapsed := time.Since(c.lastRequest); elapsed < c.minInterval {
-			sleepFor = c.minInterval - elapsed
+	waitUntil := time.Now()
+	if c.nextRequestAt.After(waitUntil) {
+		waitUntil = c.nextRequestAt
+	}
+	reservedNext := waitUntil.Add(c.minInterval)
+	c.nextRequestAt = reservedNext
+	c.rateMu.Unlock()
+
+	if delay := time.Until(waitUntil); delay > 0 {
+		timer := time.NewTimer(delay)
+		defer timer.Stop()
+
+		select {
+		case <-ctx.Done():
+			c.rateMu.Lock()
+			if c.nextRequestAt.Equal(reservedNext) {
+				c.nextRequestAt = waitUntil
+			}
+			c.rateMu.Unlock()
+			return ctx.Err()
+		case <-timer.C:
 		}
 	}
-	c.rateMu.Unlock()
 
-	if sleepFor > 0 {
-		time.Sleep(sleepFor)
-	}
-
-	c.rateMu.Lock()
-	c.lastRequest = time.Now()
-	c.rateMu.Unlock()
+	return nil
 }
 
 // paginationJitter returns a random duration between 50ms and 150ms.

@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"io"
+	"maps"
 	"net/http"
 	"regexp"
 	"time"
@@ -95,16 +96,20 @@ func (c *Client) refreshQueryIDs(ctx context.Context) {
 		scraper = scrapeQueryIDs
 	}
 	refreshed := scraper(ctx)
+
 	c.queryIDMu.Lock()
 	defer c.queryIDMu.Unlock()
-	for op, id := range BundledBaselineQueryIDs {
-		c.queryIDCache[op] = id
-	}
+
+	merged := make(map[string]string, len(BundledBaselineQueryIDs)+len(c.queryIDCache)+len(refreshed))
+	maps.Copy(merged, BundledBaselineQueryIDs)
+	maps.Copy(merged, c.queryIDCache)
 	for op, id := range refreshed {
 		if id != "" && queryIDFormatRe.MatchString(id) {
-			c.queryIDCache[op] = id
+			merged[op] = id
 		}
 	}
+
+	c.queryIDCache = merged
 	c.queryIDRefreshAt = time.Now()
 }
 
