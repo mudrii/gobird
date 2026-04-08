@@ -28,4 +28,3 @@ func MapList(raw *types.WireList) *types.TwitterList {
 	}
 	return l
 }
-

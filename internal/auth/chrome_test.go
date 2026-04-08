@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -154,7 +155,7 @@ func TestDecryptChromeCookie_ValidV10(t *testing.T) {
 		} else {
 			ivBlock = dst[i-aes.BlockSize : i]
 		}
-		for j := 0; j < aes.BlockSize; j++ {
+		for j := range aes.BlockSize {
 			xored[j] = padded[i+j] ^ ivBlock[j]
 		}
 		block.Encrypt(dst[i:i+aes.BlockSize], xored)
@@ -193,7 +194,7 @@ func TestDecryptChromeCookie_V11Prefix(t *testing.T) {
 		} else {
 			ivBlock = dst[i-aes.BlockSize : i]
 		}
-		for j := 0; j < aes.BlockSize; j++ {
+		for j := range aes.BlockSize {
 			xored[j] = padded[i+j] ^ ivBlock[j]
 		}
 		block.Encrypt(dst[i:i+aes.BlockSize], xored)
@@ -237,7 +238,7 @@ func TestDecryptChromeCookie_StripsHostHashPrefix(t *testing.T) {
 		} else {
 			ivBlock = dst[i-aes.BlockSize : i]
 		}
-		for j := 0; j < aes.BlockSize; j++ {
+		for j := range aes.BlockSize {
 			xored[j] = padded[i+j] ^ ivBlock[j]
 		}
 		block.Encrypt(dst[i:i+aes.BlockSize], xored)
@@ -370,13 +371,7 @@ func TestExtractChrome_WithMockDB(t *testing.T) {
 	db.Close()
 
 	candidates := chromeCookieCandidates(dir, "")
-	found := false
-	for _, c := range candidates {
-		if c == dbPath {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(candidates, dbPath)
 	if !found {
 		t.Fatalf("expected %q in candidates, got %v", dbPath, candidates)
 	}
@@ -405,7 +400,7 @@ func cbcEncrypt(t *testing.T, key, plaintext []byte) []byte {
 		} else {
 			ivBlock = dst[i-aes.BlockSize : i]
 		}
-		for j := 0; j < aes.BlockSize; j++ {
+		for j := range aes.BlockSize {
 			xored[j] = padded[i+j] ^ ivBlock[j]
 		}
 		block.Encrypt(dst[i:i+aes.BlockSize], xored)
@@ -430,7 +425,7 @@ func cbcEncryptRaw(t *testing.T, key, padded []byte) []byte {
 		} else {
 			ivBlock = dst[i-aes.BlockSize : i]
 		}
-		for j := 0; j < aes.BlockSize; j++ {
+		for j := range aes.BlockSize {
 			xored[j] = padded[i+j] ^ ivBlock[j]
 		}
 		block.Encrypt(dst[i:i+aes.BlockSize], xored)
@@ -444,12 +439,12 @@ func TestDecryptChromeCookie_BadPaddingMiddleBytes(t *testing.T) {
 	// padding byte is wrong. Correct PKCS#7 padding of 4 means the last 4 bytes
 	// should all be 0x04.
 	plain := make([]byte, 32)
-	copy(plain, []byte("hello world test"))     // first 16 bytes
-	copy(plain[16:], []byte("abcdefghijkl"))    // next 12 bytes of content
-	plain[28] = 0x04                             // padding byte 1 (correct)
-	plain[29] = 0x04                             // padding byte 2 (correct)
-	plain[30] = 0x07                             // padding byte 3 (WRONG — should be 0x04)
-	plain[31] = 0x04                             // last byte says pad=4
+	copy(plain, []byte("hello world test"))  // first 16 bytes
+	copy(plain[16:], []byte("abcdefghijkl")) // next 12 bytes of content
+	plain[28] = 0x04                         // padding byte 1 (correct)
+	plain[29] = 0x04                         // padding byte 2 (correct)
+	plain[30] = 0x07                         // padding byte 3 (WRONG — should be 0x04)
+	plain[31] = 0x04                         // last byte says pad=4
 
 	ciphertext := cbcEncryptRaw(t, key, plain)
 	enc := append([]byte("v10"), ciphertext...)

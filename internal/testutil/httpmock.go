@@ -2,6 +2,7 @@
 package testutil
 
 import (
+	"maps"
 	"net/http"
 	"net/http/httptest"
 )
@@ -45,9 +46,7 @@ func NewHTTPClientForServer(srv *httptest.Server) *http.Client {
 			if err != nil {
 				return nil, err
 			}
-			for k, vs := range r.Header {
-				newReq.Header[k] = vs
-			}
+			maps.Copy(newReq.Header, r.Header)
 			return http.DefaultTransport.RoundTrip(newReq)
 		}),
 	}

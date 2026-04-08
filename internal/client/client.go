@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"crypto/rand"
+	"maps"
 	"math/big"
 	"net/http"
 	"sync"
@@ -74,9 +75,7 @@ func New(authToken, ct0 string, opts *Options) *Client {
 		if opts.HTTPClient != nil {
 			c.httpClient = opts.HTTPClient
 		}
-		for k, v := range opts.QueryIDCache {
-			c.queryIDCache[k] = v
-		}
+		maps.Copy(c.queryIDCache, opts.QueryIDCache)
 		if opts.RequestsPerSecond > 0 {
 			rps = opts.RequestsPerSecond
 		} else if opts.RequestsPerSecond < 0 {

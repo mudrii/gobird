@@ -6,6 +6,7 @@ package parsing_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/mudrii/gobird/internal/parsing"
@@ -866,13 +867,13 @@ func TestMapTweetResult_LegacyWithZeroValueCounts(t *testing.T) {
 }
 
 func TestMapTweetResult_VeryLongText(t *testing.T) {
-	longText := ""
-	for i := 0; i < 10000; i++ {
-		longText += "a"
+	var longText strings.Builder
+	for range 10000 {
+		longText.WriteString("a")
 	}
 	raw := &types.WireRawTweet{
 		RestID: "long1",
-		Legacy: &types.WireTweetLegacy{FullText: longText},
+		Legacy: &types.WireTweetLegacy{FullText: longText.String()},
 	}
 	td := parsing.MapTweetResult(raw)
 	if td == nil {

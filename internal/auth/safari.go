@@ -148,7 +148,7 @@ func parseSafariBinaryCookies(ctx context.Context, data []byte) ([]domainCookie,
 
 	var cookies []domainCookie
 	offset := headerSize
-	for i := 0; i < pageCount; i++ {
+	for i := range pageCount {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -181,7 +181,7 @@ func parseSafariBinaryCookiePage(page []byte) ([]domainCookie, error) {
 	}
 
 	cookies := make([]domainCookie, 0, cookieCount)
-	for i := 0; i < cookieCount; i++ {
+	for i := range cookieCount {
 		cookieOffset := int(binary.LittleEndian.Uint32(page[8+i*4 : 12+i*4]))
 		if cookieOffset <= 0 || cookieOffset+4 > len(page) {
 			continue

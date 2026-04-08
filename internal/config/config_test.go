@@ -112,7 +112,7 @@ func TestLoad_ExplicitPath_NotFound(t *testing.T) {
 	}
 }
 
-	// TestLoad_EnvVarPath verifies that BIRD_CONFIG env var is honoured.
+// TestLoad_EnvVarPath verifies that BIRD_CONFIG env var is honoured.
 func TestLoad_EnvVarPath(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "gobird.json5")

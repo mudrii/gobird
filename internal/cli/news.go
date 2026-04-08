@@ -80,7 +80,7 @@ func newTrendingCmd() *cobra.Command {
 func buildNewsOpts(tabsFlag string, limit int, defaultTabs []string, includeRaw bool) *types.NewsOptions {
 	var tabs []string
 	if tabsFlag != "" {
-		for _, t := range strings.Split(tabsFlag, ",") {
+		for t := range strings.SplitSeq(tabsFlag, ",") {
 			t = strings.TrimSpace(t)
 			if t != "" {
 				tabs = append(tabs, t)

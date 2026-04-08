@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"sync"
 )
@@ -19,9 +20,7 @@ var (
 
 func cloneFeatures(base map[string]any) map[string]any {
 	cloned := make(map[string]any, len(base))
-	for k, v := range base {
-		cloned[k] = v
-	}
+	maps.Copy(cloned, base)
 	return cloned
 }
 
@@ -320,13 +319,9 @@ func buildUserByScreenNameFieldToggles() map[string]any {
 func applyFeatureOverrides(setName string, base map[string]any) map[string]any {
 	merged := cloneFeatures(base)
 	overrides := loadFeatureOverrides()
-	for k, v := range overrides.Global {
-		merged[k] = v
-	}
+	maps.Copy(merged, overrides.Global)
 	if setOverrides, ok := overrides.Sets[setName]; ok {
-		for k, v := range setOverrides {
-			merged[k] = v
-		}
+		maps.Copy(merged, setOverrides)
 	}
 	return merged
 }

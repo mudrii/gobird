@@ -36,7 +36,7 @@ func retryDelay(attempt int, retryAfter string) time.Duration {
 	jitter := time.Duration(int(jitterByte[0])%baseDelayMs) * time.Millisecond
 
 	backoffMs := baseDelayMs
-	for i := 0; i < attempt; i++ {
+	for range attempt {
 		backoffMs *= 2
 	}
 	return time.Duration(backoffMs)*time.Millisecond + jitter

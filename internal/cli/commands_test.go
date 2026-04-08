@@ -74,8 +74,8 @@ func TestPersistentFlags_Defaults(t *testing.T) {
 	pf := cmd.PersistentFlags()
 
 	cases := []struct {
-		flag     string
-		wantDef  string
+		flag    string
+		wantDef string
 	}{
 		{"auth-token", ""},
 		{"ct0", ""},

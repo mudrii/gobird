@@ -34,10 +34,7 @@ func (c *Client) UploadMedia(ctx context.Context, data []byte, mimeType, altText
 	// APPEND phase — 5 MiB chunks.
 	for i := 0; i*mediaChunkSize < size; i++ {
 		start := i * mediaChunkSize
-		end := start + mediaChunkSize
-		if end > size {
-			end = size
-		}
+		end := min(start+mediaChunkSize, size)
 		if err := c.mediaAppend(ctx, mediaID, i, data[start:end]); err != nil {
 			return "", fmt.Errorf("media APPEND chunk %d: %w", i, err)
 		}
@@ -136,7 +133,7 @@ func (c *Client) mediaFinalize(ctx context.Context, mediaID string) error {
 }
 
 func (c *Client) mediaPollStatus(ctx context.Context, mediaID string) error {
-	for i := 0; i < mediaMaxPolls; i++ {
+	for range mediaMaxPolls {
 		statusURL := MediaUploadURL + "?command=STATUS&media_id=" + mediaID
 		body, err := c.doGET(ctx, statusURL, c.getUploadHeaders())
 		if err != nil {

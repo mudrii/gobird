@@ -354,7 +354,7 @@ func (c *Client) GetLikes(ctx context.Context, opts *types.FetchOptions) types.T
 
 	fetchFn := func(ctx context.Context, cursor string) inlinePageResult {
 		var lastErr error
-		var accumulatedErrMsg string
+		var accumulatedErrMsg strings.Builder
 
 		for {
 			refreshedThisRound := false
@@ -365,7 +365,7 @@ func (c *Client) GetLikes(ctx context.Context, opts *types.FetchOptions) types.T
 				}
 				lastErr = result.err
 				if lastErr != nil {
-					accumulatedErrMsg += lastErr.Error()
+					accumulatedErrMsg.WriteString(lastErr.Error())
 				}
 
 				// Correction #51: "Query: Unspecified" (exact case) — continue to next ID.
@@ -388,7 +388,7 @@ func (c *Client) GetLikes(ctx context.Context, opts *types.FetchOptions) types.T
 
 		// Correction #51: after exhausting all query IDs, if accumulated error includes
 		// "Query: Unspecified" (exact case), refresh and retry once.
-		if strings.Contains(accumulatedErrMsg, "Query: Unspecified") && !refreshed {
+		if strings.Contains(accumulatedErrMsg.String(), "Query: Unspecified") && !refreshed {
 			refreshed = true
 			c.refreshQueryIDs(ctx)
 			for _, qid := range c.getQueryIDs("Likes") {

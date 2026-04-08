@@ -208,7 +208,7 @@ func decryptChromeCookie(host string, enc []byte, key []byte) (string, error) {
 	if pad == 0 || pad > aes.BlockSize || pad > len(dst) {
 		return "", fmt.Errorf("invalid padding")
 	}
-	for i := 0; i < pad; i++ {
+	for i := range pad {
 		if dst[len(dst)-1-i] != byte(pad) {
 			return "", fmt.Errorf("invalid padding")
 		}

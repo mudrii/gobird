@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -409,13 +410,7 @@ func TestClient_AllQueryIDs_Wrapper(t *testing.T) {
 
 	c := newMockClient(t, srv, map[string]string{"SearchTimeline": "sqid"})
 	ids := c.AllQueryIDs("SearchTimeline")
-	found := false
-	for _, id := range ids {
-		if id == "sqid" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(ids, "sqid")
 	if !found {
 		t.Errorf("AllQueryIDs should include injected ID, got %v", ids)
 	}

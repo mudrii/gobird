@@ -136,7 +136,7 @@ func (c *Client) Search(ctx context.Context, q string, opts *types.SearchOptions
 	var lastErr error
 	refreshed := false
 
-	for attempt := 0; attempt < 2; attempt++ {
+	for range 2 {
 		retryWithRefreshedIDs := false
 		for _, qid := range queryIDs {
 			result := c.searchPage(ctx, qid, q, cursor, count, product, opts.QuoteDepth, opts.IncludeRaw)

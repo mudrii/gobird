@@ -53,6 +53,5 @@ func newUserTweetsCmd() *cobra.Command {
 		},
 	}
 
-
 	return cmd
 }

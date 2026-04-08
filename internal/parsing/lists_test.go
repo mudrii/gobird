@@ -114,4 +114,3 @@ func TestMapList_OwnerNilLegacy(t *testing.T) {
 		t.Errorf("Owner: want nil when Legacy is nil, got %+v", got.Owner)
 	}
 }
-

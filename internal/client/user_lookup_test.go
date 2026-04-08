@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"testing"
 
@@ -155,9 +156,7 @@ func newURLTestClient(baseURL string) *Client {
 		r2.URL.Host = r.URL.Host
 		// Rewrite to test server.
 		testReq, _ := http.NewRequestWithContext(r.Context(), r.Method, baseURL+r.URL.RequestURI(), r.Body)
-		for k, vs := range r.Header {
-			testReq.Header[k] = vs
-		}
+		maps.Copy(testReq.Header, r.Header)
 		return http.DefaultTransport.RoundTrip(testReq)
 	})
 	return New("fake-auth", "fake-ct0", &Options{

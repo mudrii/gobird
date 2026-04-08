@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -29,9 +30,7 @@ func (b *closeErrorBody) Close() error {
 func newBareTestClient(baseURL string) *Client {
 	transport := testutil.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		testReq, _ := http.NewRequestWithContext(r.Context(), r.Method, baseURL+r.URL.RequestURI(), r.Body)
-		for k, vs := range r.Header {
-			testReq.Header[k] = vs
-		}
+		maps.Copy(testReq.Header, r.Header)
 		return http.DefaultTransport.RoundTrip(testReq)
 	})
 	c := New("fake-auth", "fake-ct0", &Options{
