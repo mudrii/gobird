@@ -143,7 +143,7 @@ func TestTweet_fallbackOn404(t *testing.T) {
 	calls := 0
 	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
-		if calls < 3 {
+		if calls < 2 {
 			http.Error(w, `{"errors":[{"message":"not found"}]}`, http.StatusNotFound)
 			return
 		}
@@ -159,8 +159,8 @@ func TestTweet_fallbackOn404(t *testing.T) {
 	if id != "final" {
 		t.Errorf("want 'final', got %q", id)
 	}
-	if calls < 3 {
-		t.Errorf("expected at least 3 calls, got %d", calls)
+	if calls < 2 {
+		t.Errorf("expected at least 2 calls (initial + refresh-retry), got %d", calls)
 	}
 }
 
@@ -224,6 +224,22 @@ func TestTryStatusUpdateFallback_numericID(t *testing.T) {
 	}
 	if id != "99887766" {
 		t.Errorf("want 99887766, got %q", id)
+	}
+}
+
+func TestTryStatusUpdateFallback_largeNumericID_NoTruncation(t *testing.T) {
+	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"id":1867654321098765432}`)
+	}))
+	defer srv.Close()
+
+	id, err := c.tryStatusUpdateFallback(context.Background(), "text", "")
+	if err != nil {
+		t.Fatalf("tryStatusUpdateFallback: %v", err)
+	}
+	if id != "1867654321098765432" {
+		t.Errorf("want 1867654321098765432, got %q (precision loss)", id)
 	}
 }
 

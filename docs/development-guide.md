@@ -169,7 +169,11 @@ func (c *Client) GetMyNewData(ctx context.Context, someID string, opts *types.Fe
         url.QueryEscape(string(varsJSON)),
         url.QueryEscape(string(featuresJSON)),
     )
-    body, err := c.doGET(ctx, reqURL, c.getJSONHeaders())
+    headers, err := c.getJSONHeaders()
+    if err != nil {
+        return SomeResult{}, fmt.Errorf("client: GetMyNewData: %w", err)
+    }
+    body, err := c.doGET(ctx, reqURL, headers)
     if err != nil {
         return SomeResult{}, fmt.Errorf("client: GetMyNewData: %w", err)
     }

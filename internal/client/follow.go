@@ -71,24 +71,31 @@ func (c *Client) followViaREST(ctx context.Context, endpoint, userID string) err
 	params.Set("user_id", userID)
 	params.Set("skip_status", "true")
 
-	headers := c.getBaseHeaders()
+	headers, err := c.getBaseHeaders()
+	if err != nil {
+		return err
+	}
 	body, err := c.doPOSTForm(ctx, endpoint, headers, params.Encode())
 	if err != nil {
 		return parseFollowRESTError(err)
 	}
 
-	// Treat code 160 (already following) as success.
-	var resp map[string]any
-	if jsonErr := json.Unmarshal(body, &resp); jsonErr == nil {
-		if errs, ok := resp["errors"].([]any); ok {
-			for _, e := range errs {
-				if em, ok := e.(map[string]any); ok {
-					if code, _ := em["code"].(float64); int(code) == restErrAlreadyFollowing {
-						return nil
-					}
-				}
+	// Treat code 160 (already following) as success; surface any other error
+	// code present in the body so callers don't silently swallow failures.
+	var resp struct {
+		Errors []struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if jsonErr := json.Unmarshal(body, &resp); jsonErr == nil && len(resp.Errors) > 0 {
+		for _, e := range resp.Errors {
+			if e.Code == restErrAlreadyFollowing {
+				return nil
 			}
 		}
+		first := resp.Errors[0]
+		return &followError{Code: first.Code, Message: first.Message}
 	}
 	return nil
 }
@@ -101,7 +108,10 @@ func (c *Client) followViaGraphQL(ctx context.Context, userID string) error {
 		"variables": map[string]any{"user_id": userID},
 		"queryId":   queryID,
 	}
-	headers := c.getJSONHeaders()
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return err
+	}
 	respBody, err := c.doPOSTJSON(ctx, graphqlURL("CreateFriendship", queryID), headers, body)
 	if err != nil {
 		return err
@@ -116,7 +126,10 @@ func (c *Client) unfollowViaGraphQL(ctx context.Context, userID string) error {
 		"variables": map[string]any{"user_id": userID},
 		"queryId":   queryID,
 	}
-	headers := c.getJSONHeaders()
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return err
+	}
 	respBody, err := c.doPOSTJSON(ctx, graphqlURL("DestroyFriendship", queryID), headers, body)
 	if err != nil {
 		return err

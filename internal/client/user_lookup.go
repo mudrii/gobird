@@ -40,7 +40,11 @@ func (c *Client) GetUserAboutAccount(ctx context.Context, username string) (*typ
 		reqURL := fmt.Sprintf("%s/%s/AboutAccountQuery?variables=%s",
 			GraphQLBaseURL, queryID, url.QueryEscape(string(varsJSON)))
 
-		body, err := c.doGET(ctx, reqURL, c.getJSONHeaders())
+		headers, err := c.getJSONHeaders()
+		if err != nil {
+			return attemptResult{err: err}
+		}
+		body, err := c.doGET(ctx, reqURL, headers)
 		if err != nil {
 			had404 := is404(err)
 			return attemptResult{err: err, had404: had404}
@@ -129,7 +133,11 @@ func (c *Client) fetchUserByScreenName(ctx context.Context, username string) (*t
 			url.QueryEscape(string(featuresJSON)),
 			url.QueryEscape(string(togglesJSON)),
 		)
-		body, err := c.doGET(ctx, reqURL, c.getJSONHeaders())
+		headers, err := c.getJSONHeaders()
+		if err != nil {
+			return nil, err
+		}
+		body, err := c.doGET(ctx, reqURL, headers)
 		if err != nil {
 			if is404(err) {
 				continue
@@ -150,7 +158,11 @@ func (c *Client) fetchUserByScreenName(ctx context.Context, username string) (*t
 
 	// REST fallback: users/show.json (correction #55).
 	restURL := fmt.Sprintf("%s?screen_name=%s", UserLookupRESTURL, url.QueryEscape(username))
-	body, err := c.doGET(ctx, restURL, c.getJSONHeaders())
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return nil, err
+	}
+	body, err := c.doGET(ctx, restURL, headers)
 	if err != nil {
 		return nil, fmt.Errorf("user %q not found: %w", username, err)
 	}

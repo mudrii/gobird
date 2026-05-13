@@ -39,7 +39,7 @@ func (c *Client) GetListMemberships(ctx context.Context, opts *types.FetchOption
 // fetchLists paginates a list operation (ListOwnerships or ListMemberships).
 func (c *Client) fetchLists(ctx context.Context, operation string, userID string, opts *types.FetchOptions) (*types.ListResult, error) {
 	var allLists []types.TwitterList
-	seen := map[string]bool{}
+	seen := make(map[string]struct{})
 	pagesFetched := 0
 	cursor := opts.Cursor
 
@@ -57,7 +57,7 @@ func (c *Client) fetchLists(ctx context.Context, operation string, userID string
 			}
 		}
 
-		page, err := c.fetchListsPage(ctx, operation, userID, cursor, opts.IncludeRaw)
+		page, err := c.fetchListsPage(ctx, operation, userID, opts.IncludeRaw)
 		if err != nil {
 			if len(allLists) > 0 {
 				return &types.ListResult{Items: allLists, Success: false, Error: err, NextCursor: cursor}, nil
@@ -67,10 +67,11 @@ func (c *Client) fetchLists(ctx context.Context, operation string, userID string
 
 		pagesFetched++
 		for _, l := range page.Items {
-			if !seen[l.ID] {
-				seen[l.ID] = true
-				allLists = append(allLists, l)
+			if _, dup := seen[l.ID]; dup {
+				continue
 			}
+			seen[l.ID] = struct{}{}
+			allLists = append(allLists, l)
 		}
 
 		nextCursor := page.NextCursor
@@ -88,7 +89,7 @@ func (c *Client) fetchLists(ctx context.Context, operation string, userID string
 // Correction #30: ListOwnerships variables:
 // {"userId":"<currentUserId>","count":100,"isListMembershipShown":true,"isListMemberTargetUserId":"<currentUserId>"}
 // No cursor even for pagination.
-func (c *Client) fetchListsPage(ctx context.Context, operation string, userID string, _ string, includeRaw bool) (*types.ListPage, error) {
+func (c *Client) fetchListsPage(ctx context.Context, operation string, userID string, includeRaw bool) (*types.ListPage, error) {
 	queryIDs := c.getQueryIDs(operation)
 	features := buildListsFeatures()
 
@@ -112,6 +113,10 @@ func (c *Client) fetchListsPage(ctx context.Context, operation string, userID st
 	if len(queryIDs) == 0 {
 		return nil, fmt.Errorf("%s: no query IDs available", operation)
 	}
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return nil, err
+	}
 	var lastErr error
 	for _, queryID := range queryIDs {
 		reqURL := fmt.Sprintf("%s/%s/%s?variables=%s&features=%s",
@@ -119,7 +124,7 @@ func (c *Client) fetchListsPage(ctx context.Context, operation string, userID st
 			url.QueryEscape(string(varsJSON)),
 			url.QueryEscape(string(featuresJSON)),
 		)
-		body, err := c.doGET(ctx, reqURL, c.getJSONHeaders())
+		body, err := c.doGET(ctx, reqURL, headers)
 		if err != nil {
 			lastErr = err
 			continue
@@ -138,7 +143,7 @@ func (c *Client) GetListTimeline(ctx context.Context, listID string, opts *types
 	}
 
 	var allTweets []types.TweetData
-	seen := map[string]bool{}
+	seen := make(map[string]struct{})
 	pagesFetched := 0
 	cursor := opts.Cursor
 
@@ -166,10 +171,11 @@ func (c *Client) GetListTimeline(ctx context.Context, listID string, opts *types
 
 		pagesFetched++
 		for _, t := range page.Items {
-			if !seen[t.ID] {
-				seen[t.ID] = true
-				allTweets = append(allTweets, t)
+			if _, dup := seen[t.ID]; dup {
+				continue
 			}
+			seen[t.ID] = struct{}{}
+			allTweets = append(allTweets, t)
 		}
 
 		nextCursor := page.NextCursor
@@ -208,6 +214,10 @@ func (c *Client) fetchListTimelinePage(ctx context.Context, listID string, curso
 	if len(queryIDs) == 0 {
 		return nil, fmt.Errorf("ListLatestTweetsTimeline: no query IDs available for list %q", listID)
 	}
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return nil, err
+	}
 	var lastErr error
 	for _, queryID := range queryIDs {
 		reqURL := fmt.Sprintf("%s/%s/ListLatestTweetsTimeline?variables=%s&features=%s",
@@ -215,7 +225,7 @@ func (c *Client) fetchListTimelinePage(ctx context.Context, listID string, curso
 			url.QueryEscape(string(varsJSON)),
 			url.QueryEscape(string(featuresJSON)),
 		)
-		body, err := c.doGET(ctx, reqURL, c.getJSONHeaders())
+		body, err := c.doGET(ctx, reqURL, headers)
 		if err != nil {
 			lastErr = err
 			continue
@@ -276,53 +286,22 @@ func parseListsFromInstructions(body []byte, includeRaw bool) (*types.ListPage, 
 	}
 	instructions := env.Data.User.Result.Timeline.Timeline.Instructions
 	var lists []types.TwitterList
-	seen := map[string]bool{}
-	// Parse list items from raw JSON since WireItemContent doesn't have list_results.
-	var rawEnv struct {
-		Data struct {
-			User struct {
-				Result struct {
-					Timeline struct {
-						Timeline struct {
-							Instructions []json.RawMessage `json:"instructions"`
-						} `json:"timeline"`
-					} `json:"timeline"`
-				} `json:"result"`
-			} `json:"user"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(body, &rawEnv); err != nil {
-		return nil, err
-	}
-	for _, instRaw := range rawEnv.Data.User.Result.Timeline.Timeline.Instructions {
-		var inst struct {
-			Entries []struct {
-				Content struct {
-					ItemContent *struct {
-						ListResult *struct {
-							Result *types.WireList `json:"result"`
-						} `json:"list_results"`
-					} `json:"itemContent"`
-				} `json:"content"`
-			} `json:"entries"`
-		}
-		if err := json.Unmarshal(instRaw, &inst); err != nil {
-			continue
-		}
+	seen := make(map[string]struct{})
+	for _, inst := range instructions {
 		for _, entry := range inst.Entries {
-			if entry.Content.ItemContent == nil || entry.Content.ItemContent.ListResult == nil {
+			ic := entry.Content.ItemContent
+			if ic == nil || ic.ListResult == nil {
 				continue
 			}
-			wl := entry.Content.ItemContent.ListResult.Result
+			wl := ic.ListResult.Result
 			if wl == nil || wl.IDStr == "" {
 				continue
 			}
-			if seen[wl.IDStr] {
+			if _, dup := seen[wl.IDStr]; dup {
 				continue
 			}
-			seen[wl.IDStr] = true
-			tl := mapWireList(wl)
-			lists = append(lists, tl)
+			seen[wl.IDStr] = struct{}{}
+			lists = append(lists, mapWireList(wl))
 		}
 	}
 

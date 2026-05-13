@@ -149,6 +149,11 @@ type ClientOptions struct {
     // Default: 1.0 (one request per second).
     // Set to 0 or a negative value to disable throttling.
     RequestsPerSecond float64
+
+    // Logger receives structured diagnostic events: query-ID refresh
+    // outcomes, scrape failures, and retry decisions. When nil, all
+    // events are discarded.
+    Logger *slog.Logger
 }
 ```
 

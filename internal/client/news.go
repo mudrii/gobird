@@ -27,7 +27,7 @@ func (c *Client) GetNews(ctx context.Context, opts *types.NewsOptions) ([]types.
 	}
 
 	var allItems []types.NewsItem
-	seen := map[string]bool{}
+	seen := make(map[string]struct{})
 	var firstErr error
 
 	for _, tab := range tabs {
@@ -43,10 +43,11 @@ func (c *Client) GetNews(ctx context.Context, opts *types.NewsOptions) ([]types.
 			continue
 		}
 		for _, item := range items {
-			if !seen[item.ID] {
-				seen[item.ID] = true
-				allItems = append(allItems, item)
+			if _, dup := seen[item.ID]; dup {
+				continue
 			}
+			seen[item.ID] = struct{}{}
+			allItems = append(allItems, item)
 		}
 	}
 
@@ -79,6 +80,10 @@ func (c *Client) fetchGenericTimeline(ctx context.Context, timelineID string, ma
 	}
 
 	queryIDs := c.getQueryIDs("GenericTimelineById")
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return nil, err
+	}
 	var lastErr error
 
 	tryFetch := func(ids []string) ([]types.NewsItem, bool, error) {
@@ -89,7 +94,7 @@ func (c *Client) fetchGenericTimeline(ctx context.Context, timelineID string, ma
 				url.QueryEscape(string(varsJSON)),
 				url.QueryEscape(string(featuresJSON)),
 			)
-			body, err := c.doGET(ctx, reqURL, c.getJSONHeaders())
+			body, err := c.doGET(ctx, reqURL, headers)
 			if err != nil {
 				lastErr = err
 				if is404(err) {
@@ -209,15 +214,15 @@ func parseNewsItemsRaw(body []byte) ([]types.NewsItem, error) {
 	}
 
 	var items []types.NewsItem
-	seen := map[string]bool{}
+	seen := make(map[string]struct{})
 
 	for _, inst := range env.Data.Timeline.Timeline.Instructions {
 		for _, entry := range inst.Entries {
 			if entry.Content.ItemContent != nil {
 				if tr := entry.Content.ItemContent.TrendResult; tr != nil && tr.Result != nil {
 					item := mapNewsItem(tr.Result, entry.EntryID)
-					if !seen[item.ID] {
-						seen[item.ID] = true
+					if _, dup := seen[item.ID]; !dup {
+						seen[item.ID] = struct{}{}
 						items = append(items, item)
 					}
 				}
@@ -226,8 +231,8 @@ func parseNewsItemsRaw(body []byte) ([]types.NewsItem, error) {
 				if ic := moduleItem.Item.ItemContent; ic != nil {
 					if tr := ic.TrendResult; tr != nil && tr.Result != nil {
 						item := mapNewsItem(tr.Result, "")
-						if !seen[item.ID] {
-							seen[item.ID] = true
+						if _, dup := seen[item.ID]; !dup {
+							seen[item.ID] = struct{}{}
 							items = append(items, item)
 						}
 					}

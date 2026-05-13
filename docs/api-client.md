@@ -30,6 +30,10 @@ type Client struct {
     minInterval time.Duration // Minimum interval between requests when throttling is enabled
 
     scraper func(ctx context.Context) map[string]string  // Override scrapeQueryIDs in tests
+
+    logger *slog.Logger            // Diagnostic event sink (defaults to discarding handler)
+    refreshSF singleflight.Group   // Coalesces concurrent refreshQueryIDs callers
+    userIDSF  singleflight.Group   // Coalesces concurrent getCurrentUser cold-start callers
 }
 ```
 
@@ -39,9 +43,17 @@ type Client struct {
 func New(authToken, ct0 string, opts *Options) *Client
 ```
 
-`Options.HTTPClient` replaces the default transport. `Options.QueryIDCache` seeds the runtime cache, useful in tests to inject known IDs. `Options.TimeoutMs` overrides the 30-second default only when `HTTPClient` is nil. `Options.RequestsPerSecond` configures the global client-side throttle; the default is `1.0`, and `0` or a negative value disables throttling.
+`Options.HTTPClient` replaces the default transport. `Options.QueryIDCache` seeds the runtime cache, useful in tests to inject known IDs. `Options.TimeoutMs` overrides the 30-second default only when `HTTPClient` is nil. `Options.RequestsPerSecond` configures the global client-side throttle; the default is `1.0`, and `0` or a negative value disables throttling. `Options.Logger` accepts a `*slog.Logger` that receives diagnostic events (query-ID refresh outcomes, scrape failures, retry decisions); when nil, all events are discarded.
 
 Both `clientUUID` and `deviceID` are freshly generated per-instance with `uuid.NewString()`. This mimics the browser's per-session random identifiers that X uses to correlate requests.
+
+### Concurrency Coalescing
+
+`refreshQueryIDs` and `ensureClientUserID` are both wrapped with `golang.org/x/sync/singleflight` so a stampede of callers (e.g. many goroutines hitting HTTP 404 at the same time) collapses to a single in-flight refresh or `getCurrentUser` request. This prevents wasted API quota and reduces wall-clock latency during cold starts.
+
+### Response Body Limit
+
+All response bodies are read through `io.LimitReader(resp.Body, 32 * 1024 * 1024)`. A hostile or proxied response cannot allocate more than 32 MiB on the client. Twitter/X responses are typically well under 2 MiB in practice.
 
 ---
 
@@ -136,15 +148,18 @@ func (c *Client) refreshQueryIDs(ctx context.Context)
 ```
 
 Steps:
-1. Fetches four X.com page URLs: `/home`, `/i/bookmarks`, `/explore`, `/settings/account`.
-2. Finds all `https://abs.twimg.com/...js` script URLs in each page response.
-3. Deduplicates script URLs across pages.
-4. For each unseen script URL, fetches the JS bundle content.
-5. For each operation in `FallbackQueryIDs`, applies a pre-compiled regex `([A-Za-z0-9_-]{20,})/<OperationName>\b` to extract the query ID from bundle text.
-6. Under `queryIDMu.Lock()`, builds a merged map seeded from `BundledBaselineQueryIDs`, then overlays the existing runtime cache so previously scraped IDs are preserved.
-7. Overlays any newly scraped IDs that are non-empty and pass the query-ID format check.
+1. Wraps the call in `singleflight.Group.Do("refresh", ...)` so concurrent callers share one in-flight scrape.
+2. Caps the scrape at 30 seconds via `context.WithTimeout` to bound the worst-case stall when X.com is slow.
+3. Fetches four X.com page URLs: `/home`, `/i/bookmarks`, `/explore`, `/settings/account`.
+4. Finds all `https://abs.twimg.com/...js` script URLs in each page response.
+5. Deduplicates script URLs across pages.
+6. For each unseen script URL, fetches the JS bundle content.
+7. For each operation in `FallbackQueryIDs`, applies a pre-compiled regex `([A-Za-z0-9_-]{20,})/<OperationName>\b` to extract the query ID from bundle text.
+8. Exits early once every known operation has a fresh ID so a typical refresh stops well before exhausting all script URLs.
+9. Under `queryIDMu.Lock()`, builds a merged map seeded from `BundledBaselineQueryIDs`, then overlays the existing runtime cache so previously scraped IDs are preserved.
+10. Overlays any newly scraped IDs that are non-empty and pass the query-ID format check.
 
-Errors (network failures, script fetch failures) are silently ignored. A scrape that finds nothing still preserves the previous runtime cache contents; the refresh timestamp is updated via `queryIDRefreshAt`.
+Errors (network failures, script fetch failures, deadline expiry) are reported through `c.logger` at `DEBUG` level so operators can opt into visibility. A scrape that produces no usable IDs emits a `WARN` event but still preserves the previous runtime cache contents; the refresh timestamp is updated via `queryIDRefreshAt`.
 
 The `c.scraper` field allows tests to inject a replacement function instead of hitting the real X.com.
 

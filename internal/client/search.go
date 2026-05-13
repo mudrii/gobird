@@ -71,13 +71,17 @@ func (c *Client) searchPage(ctx context.Context, queryID, q, cursor string, coun
 		"queryId":  queryID,
 	}
 
-	raw, httpErr := c.doPOSTJSON(ctx, u.String(), c.getJSONHeaders(), body)
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return inlinePageResult{success: false, err: err}
+	}
+	raw, httpErr := c.doPOSTJSON(ctx, u.String(), headers, body)
 	if httpErr != nil {
 		return inlinePageResult{success: false, err: httpErr}
 	}
 
 	// Parse GraphQL errors from body.
-	gqlErrs := parseGraphQLErrors(raw)
+	gqlErrs, _ := parseGraphQLErrors(raw)
 	if len(gqlErrs) > 0 {
 		if isSearchQueryIDMismatch(gqlErrs) {
 			return inlinePageResult{success: false, err: fmt.Errorf("GRAPHQL_VALIDATION_FAILED: %s", gqlErrs[0].Message)}
@@ -214,34 +218,42 @@ func (c *Client) GetAllSearchResults(ctx context.Context, q string, opts *types.
 		}
 		var lastErr error
 		refreshedThisPage := false
-		for _, qid := range queryIDs {
-			result := c.searchPage(ctx, qid, q, cursor, count, product, opts.QuoteDepth, opts.IncludeRaw)
-			if result.success {
-				return result
-			}
-			lastErr = result.err
 
-			shouldRefresh := false
-			var he *httpError
-			if errors.As(lastErr, &he) {
-				if (he.StatusCode == 400 || he.StatusCode == 422) &&
-					strings.Contains(he.Body, "GRAPHQL_VALIDATION_FAILED") {
+		for range 2 {
+			retryWithRefreshedIDs := false
+			for _, qid := range queryIDs {
+				result := c.searchPage(ctx, qid, q, cursor, count, product, opts.QuoteDepth, opts.IncludeRaw)
+				if result.success {
+					return result
+				}
+				lastErr = result.err
+
+				shouldRefresh := false
+				var he *httpError
+				if errors.As(lastErr, &he) {
+					if (he.StatusCode == 400 || he.StatusCode == 422) &&
+						strings.Contains(he.Body, "GRAPHQL_VALIDATION_FAILED") {
+						shouldRefresh = true
+					}
+				}
+				if !shouldRefresh && lastErr != nil &&
+					strings.Contains(lastErr.Error(), "GRAPHQL_VALIDATION_FAILED") {
 					shouldRefresh = true
 				}
-			}
-			if !shouldRefresh && lastErr != nil &&
-				strings.Contains(lastErr.Error(), "GRAPHQL_VALIDATION_FAILED") {
-				shouldRefresh = true
-			}
-			if is404(lastErr) {
-				shouldRefresh = true
-			}
+				if is404(lastErr) {
+					shouldRefresh = true
+				}
 
-			if shouldRefresh && !refreshedThisPage {
-				refreshedThisPage = true
-				c.refreshQueryIDs(ctx)
-				queryIDs = c.getQueryIDs("SearchTimeline")
-				// Retry with refreshed IDs on next iteration.
+				if shouldRefresh && !refreshedThisPage {
+					refreshedThisPage = true
+					c.refreshQueryIDs(ctx)
+					queryIDs = c.getQueryIDs("SearchTimeline")
+					retryWithRefreshedIDs = true
+					break
+				}
+			}
+			if !retryWithRefreshedIDs {
+				break
 			}
 		}
 		return inlinePageResult{success: false, err: lastErr}

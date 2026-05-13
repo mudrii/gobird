@@ -66,7 +66,11 @@ func (c *Client) mediaInit(ctx context.Context, totalBytes int, mimeType string)
 	params.Set("total_bytes", strconv.Itoa(totalBytes))
 	params.Set("media_type", mimeType)
 
-	body, err := c.doPOSTForm(ctx, MediaUploadURL, c.getUploadHeaders(), params.Encode())
+	headers, err := c.getUploadHeaders()
+	if err != nil {
+		return "", err
+	}
+	body, err := c.doPOSTForm(ctx, MediaUploadURL, headers, params.Encode())
 	if err != nil {
 		return "", err
 	}
@@ -109,7 +113,10 @@ func (c *Client) mediaAppend(ctx context.Context, mediaID string, segmentIndex i
 	if err != nil {
 		return err
 	}
-	h := c.getUploadHeaders()
+	h, err := c.getUploadHeaders()
+	if err != nil {
+		return err
+	}
 	for k, vs := range h {
 		for _, v := range vs {
 			req.Header.Add(k, v)
@@ -128,14 +135,22 @@ func (c *Client) mediaFinalize(ctx context.Context, mediaID string) error {
 	params := url.Values{}
 	params.Set("command", "FINALIZE")
 	params.Set("media_id", mediaID)
-	_, err := c.doPOSTForm(ctx, MediaUploadURL, c.getUploadHeaders(), params.Encode())
+	headers, err := c.getUploadHeaders()
+	if err != nil {
+		return err
+	}
+	_, err = c.doPOSTForm(ctx, MediaUploadURL, headers, params.Encode())
 	return err
 }
 
 func (c *Client) mediaPollStatus(ctx context.Context, mediaID string) error {
+	headers, err := c.getUploadHeaders()
+	if err != nil {
+		return err
+	}
 	for range mediaMaxPolls {
 		statusURL := MediaUploadURL + "?command=STATUS&media_id=" + mediaID
-		body, err := c.doGET(ctx, statusURL, c.getUploadHeaders())
+		body, err := c.doGET(ctx, statusURL, headers)
 		if err != nil {
 			return err
 		}
@@ -160,7 +175,7 @@ func (c *Client) mediaPollStatus(ctx context.Context, mediaID string) error {
 		delay := 2 * time.Second
 		if resp.ProcessingInfo.CheckAfterSecs != nil {
 			d := time.Duration(*resp.ProcessingInfo.CheckAfterSecs) * time.Second
-			if d >= time.Second {
+			if d > 0 {
 				delay = d
 			}
 		}
@@ -178,7 +193,10 @@ func (c *Client) mediaSetAltText(ctx context.Context, mediaID, altText string) e
 		"media_id": mediaID,
 		"alt_text": map[string]string{"text": altText},
 	}
-	h := c.getJSONHeaders()
-	_, err := c.doPOSTJSON(ctx, MediaMetadataURL, h, body)
+	h, err := c.getJSONHeaders()
+	if err != nil {
+		return err
+	}
+	_, err = c.doPOSTJSON(ctx, MediaMetadataURL, h, body)
 	return err
 }

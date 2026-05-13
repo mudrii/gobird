@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
-	"strings"
 
 	"github.com/mudrii/gobird/internal/parsing"
 	"github.com/mudrii/gobird/internal/types"
@@ -49,14 +48,18 @@ func (c *Client) homeTimelinePage(ctx context.Context, operation, queryID, curso
 	q.Set("features", string(featJSON))
 	u.RawQuery = q.Encode()
 
-	raw, httpErr := c.doGET(ctx, u.String(), c.getJSONHeaders())
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return inlinePageResult{success: false, err: err}
+	}
+	raw, httpErr := c.doGET(ctx, u.String(), headers)
 	if httpErr != nil {
 		return inlinePageResult{success: false, err: httpErr}
 	}
 
 	// Check GraphQL errors — if they match the "query: unspecified" pattern,
 	// return as a refresh-triggering failure (correction #77).
-	gqlErrs := parseGraphQLErrors(raw)
+	gqlErrs, _ := parseGraphQLErrors(raw)
 	for _, e := range gqlErrs {
 		if queryUnspecifiedRe.MatchString(e.Message) {
 			return inlinePageResult{
@@ -129,8 +132,7 @@ func (c *Client) getHomeTimelineInternal(ctx context.Context, operation string, 
 				}
 				lastErr = result.err
 
-				shouldRefresh := is404(lastErr) || isQueryUnspecifiedError(lastErr) ||
-					(lastErr != nil && strings.Contains(lastErr.Error(), "query: unspecified"))
+				shouldRefresh := is404(lastErr) || isQueryUnspecifiedError(lastErr)
 
 				if shouldRefresh && !refreshed {
 					refreshed = true

@@ -45,7 +45,7 @@ func ParseTweetsFromInstructions(instructions []types.WireTimelineInstruction) [
 // results from a slice of timeline instructions.
 func ParseTweetsFromInstructionsWithOptions(instructions []types.WireTimelineInstruction, opts TweetParseOptions) []types.TweetData {
 	var tweets []types.TweetData
-	seen := map[string]bool{}
+	seen := make(map[string]struct{})
 	for _, inst := range instructions {
 		for i := range inst.Entries {
 			for _, raw := range CollectTweetResultsFromEntry(&inst.Entries[i]) {
@@ -53,10 +53,10 @@ func ParseTweetsFromInstructionsWithOptions(instructions []types.WireTimelineIns
 				if unwrapped == nil || unwrapped.RestID == "" {
 					continue
 				}
-				if seen[unwrapped.RestID] {
+				if _, dup := seen[unwrapped.RestID]; dup {
 					continue
 				}
-				seen[unwrapped.RestID] = true
+				seen[unwrapped.RestID] = struct{}{}
 				if td := MapTweetResultWithOptions(unwrapped, opts); td != nil {
 					tweets = append(tweets, *td)
 				}

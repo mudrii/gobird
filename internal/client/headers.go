@@ -3,20 +3,25 @@ package client
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 )
 
-func createTransactionID() string {
+func createTransactionID() (string, error) {
 	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {
-		return ""
+		return "", fmt.Errorf("crypto/rand: %w", err)
 	}
-	return hex.EncodeToString(buf)
+	return hex.EncodeToString(buf), nil
 }
 
 // baseHeaders returns the standard request headers shared across all requests.
 // These are the exact header names and values from the reference source.
-func baseHeaders(authToken, ct0, clientUUID, deviceID, userID string) http.Header {
+func baseHeaders(authToken, ct0, clientUUID, deviceID, userID string) (http.Header, error) {
+	txID, err := createTransactionID()
+	if err != nil {
+		return nil, err
+	}
 	h := http.Header{}
 	h.Set("accept", "*/*")
 	h.Set("accept-language", "en-US,en;q=0.9")
@@ -31,9 +36,7 @@ func baseHeaders(authToken, ct0, clientUUID, deviceID, userID string) http.Heade
 	if deviceID != "" {
 		h.Set("x-twitter-client-deviceid", deviceID)
 	}
-	if txID := createTransactionID(); txID != "" {
-		h.Set("x-client-transaction-id", txID)
-	}
+	h.Set("x-client-transaction-id", txID)
 	if userID != "" {
 		h.Set("x-twitter-client-user-id", userID)
 	}
@@ -41,19 +44,22 @@ func baseHeaders(authToken, ct0, clientUUID, deviceID, userID string) http.Heade
 	h.Set("user-agent", UserAgent)
 	h.Set("origin", "https://x.com")
 	h.Set("referer", "https://x.com/")
-	return h
+	return h, nil
 }
 
 // jsonHeaders returns base headers plus content-type: application/json.
 // Correction #70: getHeaders() delegates to getJSONHeaders() (includes content-type).
-func jsonHeaders(authToken, ct0, clientUUID, deviceID, userID string) http.Header {
-	h := baseHeaders(authToken, ct0, clientUUID, deviceID, userID)
+func jsonHeaders(authToken, ct0, clientUUID, deviceID, userID string) (http.Header, error) {
+	h, err := baseHeaders(authToken, ct0, clientUUID, deviceID, userID)
+	if err != nil {
+		return nil, err
+	}
 	h.Set("content-type", "application/json")
-	return h
+	return h, nil
 }
 
 // uploadHeaders returns only the base headers for media upload requests.
 // Correction #70: getUploadHeaders() = getBaseHeaders() only — no content-type override.
-func uploadHeaders(authToken, ct0, clientUUID, deviceID, userID string) http.Header {
+func uploadHeaders(authToken, ct0, clientUUID, deviceID, userID string) (http.Header, error) {
 	return baseHeaders(authToken, ct0, clientUUID, deviceID, userID)
 }

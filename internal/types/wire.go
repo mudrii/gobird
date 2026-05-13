@@ -65,6 +65,12 @@ type WireItemContent struct {
 	TypeName    string           `json:"__typename"`
 	TweetResult *WireTweetResult `json:"tweet_results"`
 	UserResult  *WireUserResult  `json:"user_results"`
+	ListResult  *WireListResult  `json:"list_results"`
+}
+
+// WireListResult wraps a list entry result.
+type WireListResult struct {
+	Result *WireList `json:"result"`
 }
 
 // WireTweetResult is the outer wrapper around a tweet result.

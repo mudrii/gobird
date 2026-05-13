@@ -705,3 +705,21 @@ func TestExtractChromeWithContext_V11EncryptedWithHostHash(t *testing.T) {
 		t.Errorf("ct0: want %q, got %q", ct0Val, result.Ct0)
 	}
 }
+
+func TestIsUnderAllowedParent_RejectsTraversal(t *testing.T) {
+	parents := []string{"/Users/u/Library/Application Support/Google/Chrome"}
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{"/Users/u/Library/Application Support/Google/Chrome/Default/Cookies", true},
+		{"/Users/u/Library/Application Support/Google/Chrome/../../../etc/passwd", false},
+		{"/etc/passwd", false},
+		{"/Users/u/Library/Application Support/Google/Chrome", false}, // exact parent: not "under"
+	}
+	for _, tc := range cases {
+		if got := isUnderAllowedParent(tc.path, parents); got != tc.want {
+			t.Errorf("isUnderAllowedParent(%q) = %v, want %v", tc.path, got, tc.want)
+		}
+	}
+}

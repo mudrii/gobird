@@ -40,8 +40,11 @@ func paginateInline(
 	fetch fetchPageFn,
 ) types.TweetResult {
 	var accumulated []types.TweetData
+	if opts.Limit > 0 {
+		accumulated = make([]types.TweetData, 0, opts.Limit)
+	}
 	cursor := opts.Cursor
-	seen := make(map[string]bool)
+	seen := make(map[string]struct{})
 
 	delayMs := opts.PageDelayMs
 	if delayMs == 0 {
@@ -89,13 +92,17 @@ func paginateInline(
 		// Count newly added items (dedup by ID).
 		added := 0
 		for _, t := range result.tweets {
-			if t.ID != "" && !seen[t.ID] {
-				seen[t.ID] = true
-				accumulated = append(accumulated, t)
-				added++
-				if limit > 0 && len(accumulated) >= limit {
-					break
-				}
+			if t.ID == "" {
+				continue
+			}
+			if _, dup := seen[t.ID]; dup {
+				continue
+			}
+			seen[t.ID] = struct{}{}
+			accumulated = append(accumulated, t)
+			added++
+			if limit > 0 && len(accumulated) >= limit {
+				break
 			}
 		}
 
