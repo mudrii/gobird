@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "[0-9][0-9].[0-9][0-9].[0-9][0-9]"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: "1.26.2"
+          cache: true
+
+      - name: Mod verify
+        run: go mod verify
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build artifacts
+        env:
+          TAG: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          LDFLAGS="-X main.version=${TAG} -X main.gitSHA=${SHA:0:7}"
+          mkdir -p dist
+          for PAIR in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64; do
+            GOOS=${PAIR%/*}
+            GOARCH=${PAIR#*/}
+            STAGE=$(mktemp -d)
+            GOOS=${GOOS} GOARCH=${GOARCH} go build -trimpath -ldflags "${LDFLAGS}" -o "${STAGE}/gobird" ./cmd/gobird
+            cp LICENSE "${STAGE}/LICENSE"
+            tar -czf "dist/gobird_${TAG}_${GOOS}_${GOARCH}.tar.gz" -C "${STAGE}" gobird LICENSE
+            rm -rf "${STAGE}"
+          done
+          STAGE=$(mktemp -d)
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "${LDFLAGS}" -o "${STAGE}/gobird.exe" ./cmd/gobird
+          cp LICENSE "${STAGE}/LICENSE"
+          (cd "${STAGE}" && zip -q "${GITHUB_WORKSPACE}/dist/gobird_${TAG}_windows_amd64.zip" gobird.exe LICENSE)
+          rm -rf "${STAGE}"
+          (cd dist && sha256sum gobird_${TAG}_*.tar.gz gobird_${TAG}_*.zip > gobird_${TAG}_checksums.txt)
+          ls -lh dist/
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release upload "${TAG}" dist/gobird_${TAG}_*.tar.gz dist/gobird_${TAG}_*.zip dist/gobird_${TAG}_checksums.txt --clobber
