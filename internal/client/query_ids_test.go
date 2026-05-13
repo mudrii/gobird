@@ -2,9 +2,14 @@ package client
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/mudrii/gobird/internal/testutil"
 )
@@ -193,7 +198,11 @@ func TestScrapeBody_Non2xx(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := scrapeBody(context.Background(), &http.Client{}, srv.URL)
+	c := New("tok", "ct0", &Options{
+		HTTPClient:        &http.Client{},
+		RequestsPerSecond: -1,
+	})
+	_, err := c.scrapeBody(context.Background(), srv.URL)
 	if err == nil {
 		t.Fatal("expected non-2xx scrapeBody error")
 	}
@@ -274,5 +283,59 @@ func TestRefreshQueryIDs_PreservesExistingRuntimeIDsWhenScrapeReturnsNone(t *tes
 	c.queryIDMu.RUnlock()
 	if got != cachedID {
 		t.Fatalf("queryIDCache[TweetDetail] = %q, want preserved runtime ID %q", got, cachedID)
+	}
+}
+
+// TestRefreshQueryIDs_LogsWhenNoIDsProduced verifies the warn log path
+// when scrape returns nothing usable.
+func TestRefreshQueryIDs_LogsWhenNoIDsProduced(t *testing.T) {
+	var buf strings.Builder
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	c := New("tok", "ct0", &Options{Logger: logger})
+	c.scraper = func(_ context.Context) map[string]string { return nil }
+
+	c.refreshQueryIDs(context.Background())
+
+	got := buf.String()
+	if !strings.Contains(got, "refreshQueryIDs produced no new query IDs") {
+		t.Errorf("expected warn log line; got: %q", got)
+	}
+}
+
+// TestRefreshQueryIDs_CoalescesConcurrent verifies that a stampede of
+// concurrent refreshQueryIDs callers triggers at most a small number of
+// scrape invocations rather than one per caller. With singleflight, callers
+// that arrive while a refresh is in flight wait for it to finish and share
+// its result.
+func TestRefreshQueryIDs_CoalescesConcurrent(t *testing.T) {
+	const goroutines = 50
+	var calls atomic.Int32
+	c := New("tok", "ct0", nil)
+	c.scraper = func(_ context.Context) map[string]string {
+		calls.Add(1)
+		// Slow scraper so most goroutines arrive during the in-flight call.
+		time.Sleep(25 * time.Millisecond)
+		return map[string]string{"TweetDetail": "ValidQueryID123456789"}
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+			c.refreshQueryIDs(context.Background())
+		}()
+	}
+	wg.Wait()
+
+	got := calls.Load()
+	// Without coalescing this would equal goroutines (50). Allow a small
+	// margin (≤5) for goroutines that arrive after a refresh completes and
+	// validly trigger a new scrape.
+	if got > 5 {
+		t.Errorf("scraper called %d times for %d concurrent refreshers; want ≤5 (singleflight coalescing)", got, goroutines)
+	}
+	if got == 0 {
+		t.Error("scraper never called; refresh did not run")
 	}
 }

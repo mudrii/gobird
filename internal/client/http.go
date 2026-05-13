@@ -3,11 +3,11 @@ package client
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	mrand "math/rand/v2"
 	"net/http"
 	"strconv"
 	"strings"
@@ -29,16 +29,8 @@ func retryDelay(attempt int, retryAfter string) time.Duration {
 		}
 	}
 
-	var jitterByte [1]byte
-	if _, err := rand.Read(jitterByte[:]); err != nil {
-		jitterByte[0] = 0
-	}
-	jitter := time.Duration(int(jitterByte[0])%baseDelayMs) * time.Millisecond
-
-	backoffMs := baseDelayMs
-	for range attempt {
-		backoffMs *= 2
-	}
+	jitter := time.Duration(mrand.IntN(baseDelayMs)) * time.Millisecond
+	backoffMs := baseDelayMs << attempt
 	return time.Duration(backoffMs)*time.Millisecond + jitter
 }
 
@@ -122,8 +114,10 @@ func (c *Client) doPOSTForm(ctx context.Context, url string, headers http.Header
 	return c.do(req)
 }
 
-// maxResponseBytes limits HTTP response body reads to 100 MiB.
-const maxResponseBytes = 100 * 1024 * 1024
+// maxResponseBytes limits HTTP response body reads to 32 MiB.
+// Twitter/X responses are typically <2 MiB; this cap protects against
+// memory-DoS from hostile or corrupted upstream responses.
+const maxResponseBytes = 32 * 1024 * 1024
 
 func (c *Client) do(req *http.Request) ([]byte, error) {
 	if err := c.waitForRateLimit(req.Context()); err != nil {
@@ -223,19 +217,24 @@ func graphqlURL(operation, queryID string) string {
 }
 
 // parseGraphQLErrors checks a JSON response body for GraphQL-level errors and
-// returns them if present. Does not return an error for partial data.
-func parseGraphQLErrors(body []byte) []graphqlError {
+// returns them if present. The error return signals body was not a JSON
+// envelope (probe failure); callers that treat a non-JSON body as "no errors"
+// may discard it.
+func parseGraphQLErrors(body []byte) ([]graphqlError, error) {
 	var env struct {
 		Errors []graphqlError `json:"errors"`
 	}
 	if err := json.Unmarshal(body, &env); err != nil {
-		return nil
+		return nil, fmt.Errorf("parse graphql envelope: %w", err)
 	}
-	return env.Errors
+	return env.Errors, nil
 }
 
 func graphQLError(body []byte, operation string) error {
-	errs := parseGraphQLErrors(body)
+	errs, err := parseGraphQLErrors(body)
+	if err != nil {
+		return fmt.Errorf("%s: %w", operation, err)
+	}
 	if len(errs) == 0 {
 		return nil
 	}

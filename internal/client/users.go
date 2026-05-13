@@ -1,10 +1,10 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
 
@@ -71,13 +71,19 @@ func (c *Client) getCurrentUser(ctx context.Context) (*types.CurrentUserResult, 
 }
 
 func (c *Client) tryGetCurrentUserFromAPI(ctx context.Context, rawURL string) (*types.CurrentUserResult, error) {
-	body, err := c.doGET(ctx, rawURL, c.getJSONHeaders())
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return nil, err
+	}
+	body, err := c.doGET(ctx, rawURL, headers)
 	if err != nil {
 		return nil, err
 	}
 
 	var v map[string]any
-	if err := json.Unmarshal(body, &v); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	if err := dec.Decode(&v); err != nil {
 		return nil, err
 	}
 
@@ -130,9 +136,9 @@ func firstStringLike(values ...any) string {
 			if t != "" {
 				return t
 			}
-		case float64:
-			if t > 0 {
-				return fmt.Sprintf("%.0f", t)
+		case json.Number:
+			if s := t.String(); s != "" && s != "0" {
+				return s
 			}
 		}
 	}
@@ -140,24 +146,13 @@ func firstStringLike(values ...any) string {
 }
 
 func (c *Client) tryGetCurrentUserFromHTML(ctx context.Context, rawURL string) (*types.CurrentUserResult, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("cookie", "auth_token="+c.authToken+"; ct0="+c.ct0)
-	req.Header.Set("user-agent", UserAgent)
+	headers := http.Header{}
+	headers.Set("cookie", "auth_token="+c.authToken+"; ct0="+c.ct0)
+	headers.Set("user-agent", UserAgent)
 
-	resp, err := c.httpClient.Do(req)
+	body, err := c.doGET(ctx, rawURL, headers)
 	if err != nil {
 		return nil, err
-	}
-	body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
-	closeErr := resp.Body.Close()
-	if readErr != nil {
-		return nil, readErr
-	}
-	if closeErr != nil {
-		return nil, closeErr
 	}
 	s := string(body)
 

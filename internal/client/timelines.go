@@ -25,7 +25,11 @@ func (c *Client) bookmarkPage(ctx context.Context, queryID string, varsJSON, fea
 	q.Set("features", string(featJSON))
 	u.RawQuery = q.Encode()
 
-	raw, httpErr := c.fetchWithRetry(ctx, u.String(), c.getJSONHeaders())
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return inlinePageResult{success: false, err: err}
+	}
+	raw, httpErr := c.fetchWithRetry(ctx, u.String(), headers)
 	if httpErr != nil {
 		return inlinePageResult{success: false, err: httpErr}
 	}
@@ -158,13 +162,17 @@ func (c *Client) bookmarkFolderPage(ctx context.Context, queryID, folderID, curs
 	q.Set("features", string(featJSON))
 	u.RawQuery = q.Encode()
 
-	raw, httpErr := c.fetchWithRetry(ctx, u.String(), c.getJSONHeaders())
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return inlinePageResult{success: false, err: err}
+	}
+	raw, httpErr := c.fetchWithRetry(ctx, u.String(), headers)
 	if httpErr != nil {
 		return inlinePageResult{success: false, err: httpErr}
 	}
 
 	// Check for variable errors before parsing.
-	gqlErrs := parseGraphQLErrors(raw)
+	gqlErrs, _ := parseGraphQLErrors(raw)
 	for _, e := range gqlErrs {
 		if strings.Contains(e.Message, `Variable "$count"`) {
 			// Retry without count (correction #11).
@@ -293,8 +301,12 @@ func (c *Client) likesPage(ctx context.Context, queryID, userID, cursor string, 
 	q.Set("features", string(featJSON))
 	u.RawQuery = q.Encode()
 
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return inlinePageResult{success: false, err: err}
+	}
 	// Likes uses doGET (not fetchWithRetry) — correction #49.
-	raw, httpErr := c.doGET(ctx, u.String(), c.getJSONHeaders())
+	raw, httpErr := c.doGET(ctx, u.String(), headers)
 	if httpErr != nil {
 		return inlinePageResult{success: false, err: httpErr}
 	}

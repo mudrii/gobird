@@ -216,11 +216,11 @@ The `internal/client.Client` struct contains four categories of shared state pro
 
 ### Query ID cache (`queryIDMu sync.RWMutex`)
 
-`queryIDCache` is a `map[string]string` that maps operation names to their current query IDs. All reads use `queryIDMu.RLock()` and go through `getQueryID`. All writes happen inside `refreshQueryIDs`, which holds `queryIDMu.Lock()` while updating the map and recording `queryIDRefreshAt`. This is the most frequently contended lock: every API call reads it, and scrape refreshes write it.
+`queryIDCache` is a `map[string]string` that maps operation names to their current query IDs. All reads use `queryIDMu.RLock()` and go through `getQueryID`. All writes happen inside `refreshQueryIDs`, which holds `queryIDMu.Lock()` while updating the map and recording `queryIDRefreshAt`. This is the most frequently contended lock: every API call reads it, and scrape refreshes write it. A `singleflight.Group` (`refreshSF`) wraps the entire refresh so concurrent callers that arrive while a scrape is in flight share its result instead of triggering parallel scrapes.
 
 ### User ID cache (`userIDMu sync.RWMutex`)
 
-`userID` (the authenticated account's numeric ID) is resolved lazily by `ensureClientUserID`. The fast path holds only a read lock. The slow path calls `getCurrentUser` without holding any lock (because `getCurrentUser` itself needs to read-lock `userIDMu` via `cachedUserID`), then acquires the write lock only to store the result. A double-checked pattern guards against redundant writes: if another goroutine resolved it first, the second write is a no-op. Only successful resolutions are cached; errors are not, allowing callers to retry.
+`userID` (the authenticated account's numeric ID) is resolved lazily by `ensureClientUserID`. The fast path holds only a read lock. The slow path runs inside `singleflight.Group.Do` (`userIDSF`) so concurrent cold-start callers fire a single `getCurrentUser` request. Inside the singleflight callback, the cache is re-checked under a read lock (a sibling caller may have populated it), then the resolved ID is committed under a write lock. Only successful resolutions are cached; errors are not, allowing callers to retry.
 
 ### Global rate limiter (`rateMu sync.Mutex`)
 
@@ -276,6 +276,6 @@ Exit codes:
   4 — rate limit (HTTP 429)
 ```
 
-Errors are never silently swallowed except in two documented places:
-- `refreshQueryIDs` silently ignores scraping errors to preserve availability (previously cached runtime IDs remain in cache, with bundled IDs filling any missing keys).
-- `scrapeQueryIDs` silently skips individual page or JS bundle fetch failures and returns whatever was found.
+Errors are never silently swallowed except in two documented places, both of which now emit structured diagnostic events through `Options.Logger`:
+- `refreshQueryIDs` does not return scrape errors to the caller because availability matters more than refresh success (previously cached runtime IDs remain in cache, with bundled IDs filling any missing keys). A `WARN`-level event is emitted when no usable IDs were produced.
+- `scrapeQueryIDs` skips individual page or JS bundle fetch failures and returns whatever was found. Each failure is logged at `DEBUG` level. The scrape is bounded by a 30-second internal deadline and exits early as soon as every known operation has a fresh ID.

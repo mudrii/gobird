@@ -32,7 +32,7 @@ func (c *Client) GetFollowers(ctx context.Context, userID string, opts *types.Fe
 // paginateFollowOp paginates a following or followers operation.
 func (c *Client) paginateFollowOp(ctx context.Context, operation string, userID string, opts *types.FetchOptions) (*types.UserResult, error) {
 	var allUsers []types.TwitterUser
-	seen := map[string]bool{}
+	seen := make(map[string]struct{})
 	pagesFetched := 0
 	cursor := opts.Cursor
 
@@ -60,10 +60,11 @@ func (c *Client) paginateFollowOp(ctx context.Context, operation string, userID 
 
 		pagesFetched++
 		for _, u := range page.Items {
-			if !seen[u.ID] {
-				seen[u.ID] = true
-				allUsers = append(allUsers, u)
+			if _, dup := seen[u.ID]; dup {
+				continue
 			}
+			seen[u.ID] = struct{}{}
+			allUsers = append(allUsers, u)
 		}
 
 		nextCursor := page.NextCursor
@@ -130,6 +131,10 @@ func (c *Client) fetchFollowPage(ctx context.Context, operation string, userID s
 		return nil, err
 	}
 
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return nil, err
+	}
 	var lastErr error
 	for _, queryID := range queryIDs {
 		reqURL := fmt.Sprintf("%s/%s/%s?variables=%s&features=%s",
@@ -137,7 +142,7 @@ func (c *Client) fetchFollowPage(ctx context.Context, operation string, userID s
 			url.QueryEscape(string(varsJSON)),
 			url.QueryEscape(string(featuresJSON)),
 		)
-		body, err := c.doGET(ctx, reqURL, c.getJSONHeaders())
+		body, err := c.doGET(ctx, reqURL, headers)
 		if err != nil {
 			lastErr = err
 			continue
@@ -175,9 +180,13 @@ func (c *Client) fetchFollowPageREST(ctx context.Context, operation string, user
 		fallbackURL += "&cursor=" + url.QueryEscape(cursor)
 	}
 
-	body, err := c.doGET(ctx, primaryURL, c.getJSONHeaders())
+	headers, err := c.getJSONHeaders()
 	if err != nil {
-		body, err = c.doGET(ctx, fallbackURL, c.getJSONHeaders())
+		return nil, err
+	}
+	body, err := c.doGET(ctx, primaryURL, headers)
+	if err != nil {
+		body, err = c.doGET(ctx, fallbackURL, headers)
 		if err != nil {
 			return nil, err
 		}

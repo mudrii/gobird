@@ -309,6 +309,41 @@ func TestMediaSetAltText_success(t *testing.T) {
 	}
 }
 
+func TestMediaPollStatus_RespectsServerOneSecond(t *testing.T) {
+	c := New("tok", "ct0", &Options{HTTPClient: &http.Client{}, RequestsPerSecond: -1})
+	c.scraper = func(_ context.Context) map[string]string { return nil }
+
+	calls := 0
+	first := time.Now()
+	var pollGap time.Duration
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		if calls == 1 {
+			w.Write([]byte(`{"processing_info":{"state":"in_progress","check_after_secs":1}}`))
+			return
+		}
+		pollGap = time.Since(first)
+		w.Write([]byte(`{"processing_info":{"state":"succeeded"}}`))
+	}))
+	defer srv.Close()
+	c.httpClient = &http.Client{
+		Transport: redirectTransport(srv.URL),
+	}
+
+	err := c.mediaPollStatus(context.Background(), "media123")
+	if err != nil {
+		t.Fatalf("mediaPollStatus: %v", err)
+	}
+	if calls != 2 {
+		t.Errorf("calls: want 2, got %d", calls)
+	}
+	if pollGap >= 1500*time.Millisecond {
+		t.Errorf("server returned check_after_secs=1; got poll gap %v, want <1.5s", pollGap)
+	}
+}
+
 func TestUploadMedia_multipleChunks(t *testing.T) {
 	appendSegments := 0
 	c, srv := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

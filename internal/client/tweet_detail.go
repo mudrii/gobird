@@ -65,6 +65,11 @@ func (c *Client) fetchTweetDetail(ctx context.Context, focalTweetID string, curs
 		return nil, fmt.Errorf("fetchTweetDetail: marshal fieldToggles: %w", err)
 	}
 
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return nil, err
+	}
+
 	tryQueryIDs := func(queryIDs []string) ([]byte, error, bool) {
 		had404 := false
 		var lastErr error
@@ -75,7 +80,7 @@ func (c *Client) fetchTweetDetail(ctx context.Context, focalTweetID string, curs
 				url.QueryEscape(string(featuresJSON)),
 				url.QueryEscape(string(togglesJSON)),
 			)
-			body, err := c.doGET(ctx, getURL, c.getJSONHeaders())
+			body, err := c.doGET(ctx, getURL, headers)
 			if err == nil {
 				return body, nil, false
 			}
@@ -91,7 +96,7 @@ func (c *Client) fetchTweetDetail(ctx context.Context, focalTweetID string, curs
 				"features":  features,
 				"queryId":   queryID,
 			}
-			body, postErr := c.doPOSTJSON(ctx, postURL, c.getJSONHeaders(), postBody)
+			body, postErr := c.doPOSTJSON(ctx, postURL, headers, postBody)
 			if postErr == nil {
 				return body, nil, false
 			}
@@ -162,7 +167,7 @@ func (c *Client) GetReplies(ctx context.Context, tweetID string, opts *types.Thr
 	if opts == nil {
 		opts = &types.ThreadOptions{}
 	}
-	return c.paginateCursor(ctx, tweetID, opts, false)
+	return c.paginateCursor(ctx, tweetID, opts)
 }
 
 // GetThread fetches the full thread for a tweet, applying filter mode.
@@ -171,7 +176,7 @@ func (c *Client) GetThread(ctx context.Context, tweetID string, opts *types.Thre
 	if opts == nil {
 		opts = &types.ThreadOptions{}
 	}
-	result, err := c.paginateCursor(ctx, tweetID, opts, true)
+	result, err := c.paginateCursor(ctx, tweetID, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -197,14 +202,13 @@ func (c *Client) GetThread(ctx context.Context, tweetID string, opts *types.Thre
 // paginateCursor implements the pagination loop for replies/thread.
 // Correction: loop terminates on empty cursor OR unchanged cursor ONLY.
 // Zero items does NOT stop.
-func (c *Client) paginateCursor(ctx context.Context, tweetID string, opts *types.ThreadOptions, isThread bool) (*types.TweetResult, error) {
-	_ = isThread
+func (c *Client) paginateCursor(ctx context.Context, tweetID string, opts *types.ThreadOptions) (*types.TweetResult, error) {
 	maxPages := opts.MaxPages
 	pageDelayMs := opts.PageDelayMs
 	cursor := opts.Cursor
 
 	var allTweets []types.TweetData
-	seen := map[string]bool{}
+	seen := make(map[string]struct{})
 	pagesFetched := 0
 
 	for {
@@ -238,10 +242,11 @@ func (c *Client) paginateCursor(ctx context.Context, tweetID string, opts *types
 
 		// Step 5: deduplicate by ID.
 		for _, t := range page.Items {
-			if !seen[t.ID] {
-				seen[t.ID] = true
-				allTweets = append(allTweets, t)
+			if _, dup := seen[t.ID]; dup {
+				continue
 			}
+			seen[t.ID] = struct{}{}
+			allTweets = append(allTweets, t)
 		}
 
 		// Step 6: get page cursor.

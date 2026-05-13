@@ -148,10 +148,20 @@ func extractWithTimeout(timeoutMs int, fn func(context.Context) (*types.TwitterC
 	}()
 
 	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("cookie extraction timed out after %dms", timeoutMs)
 	case res := <-ch:
 		return res.creds, res.err
+	case <-ctx.Done():
+		// Drain any successful extraction the worker produced before honoring
+		// cancel — avoids discarding good creds on a tight race. Discard a
+		// drained error (it's just ctx.Err()) and surface the timeout instead.
+		select {
+		case res := <-ch:
+			if res.creds != nil && res.err == nil {
+				return res.creds, nil
+			}
+		default:
+		}
+		return nil, fmt.Errorf("cookie extraction timed out after %dms", timeoutMs)
 	}
 }
 

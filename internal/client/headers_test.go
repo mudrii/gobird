@@ -5,7 +5,10 @@ import (
 )
 
 func TestBaseHeaders_allFieldsSet(t *testing.T) {
-	h := baseHeaders("myAuth", "myCt0", "myUUID", "myDevice", "myUser")
+	h, err := baseHeaders("myAuth", "myCt0", "myUUID", "myDevice", "myUser")
+	if err != nil {
+		t.Fatalf("baseHeaders: %v", err)
+	}
 
 	tests := []struct {
 		header string
@@ -35,28 +38,40 @@ func TestBaseHeaders_allFieldsSet(t *testing.T) {
 }
 
 func TestBaseHeaders_emptyClientUUID(t *testing.T) {
-	h := baseHeaders("a", "b", "", "dev", "")
+	h, err := baseHeaders("a", "b", "", "dev", "")
+	if err != nil {
+		t.Fatalf("baseHeaders: %v", err)
+	}
 	if h.Get("x-client-uuid") != "" {
 		t.Error("x-client-uuid should be omitted when clientUUID is empty")
 	}
 }
 
 func TestBaseHeaders_emptyDeviceID(t *testing.T) {
-	h := baseHeaders("a", "b", "uuid", "", "")
+	h, err := baseHeaders("a", "b", "uuid", "", "")
+	if err != nil {
+		t.Fatalf("baseHeaders: %v", err)
+	}
 	if h.Get("x-twitter-client-deviceid") != "" {
 		t.Error("x-twitter-client-deviceid should be omitted when deviceID is empty")
 	}
 }
 
 func TestBaseHeaders_emptyUserID(t *testing.T) {
-	h := baseHeaders("a", "b", "uuid", "dev", "")
+	h, err := baseHeaders("a", "b", "uuid", "dev", "")
+	if err != nil {
+		t.Fatalf("baseHeaders: %v", err)
+	}
 	if h.Get("x-twitter-client-user-id") != "" {
 		t.Error("x-twitter-client-user-id should be omitted when userID is empty")
 	}
 }
 
 func TestBaseHeaders_transactionIDPresent(t *testing.T) {
-	h := baseHeaders("a", "b", "uuid", "dev", "")
+	h, err := baseHeaders("a", "b", "uuid", "dev", "")
+	if err != nil {
+		t.Fatalf("baseHeaders: %v", err)
+	}
 	txID := h.Get("x-client-transaction-id")
 	if txID == "" {
 		t.Error("x-client-transaction-id should be set")
@@ -67,15 +82,24 @@ func TestBaseHeaders_transactionIDPresent(t *testing.T) {
 }
 
 func TestBaseHeaders_transactionIDUnique(t *testing.T) {
-	h1 := baseHeaders("a", "b", "", "", "")
-	h2 := baseHeaders("a", "b", "", "", "")
+	h1, err := baseHeaders("a", "b", "", "", "")
+	if err != nil {
+		t.Fatalf("baseHeaders: %v", err)
+	}
+	h2, err := baseHeaders("a", "b", "", "", "")
+	if err != nil {
+		t.Fatalf("baseHeaders: %v", err)
+	}
 	if h1.Get("x-client-transaction-id") == h2.Get("x-client-transaction-id") {
 		t.Error("transaction IDs should be unique across calls")
 	}
 }
 
 func TestJsonHeaders_hasContentType(t *testing.T) {
-	h := jsonHeaders("a", "b", "uuid", "dev", "")
+	h, err := jsonHeaders("a", "b", "uuid", "dev", "")
+	if err != nil {
+		t.Fatalf("jsonHeaders: %v", err)
+	}
 	ct := h.Get("content-type")
 	if ct != "application/json" {
 		t.Errorf("content-type: want application/json, got %q", ct)
@@ -83,7 +107,10 @@ func TestJsonHeaders_hasContentType(t *testing.T) {
 }
 
 func TestJsonHeaders_includesBaseHeaders(t *testing.T) {
-	h := jsonHeaders("a", "b", "uuid", "dev", "")
+	h, err := jsonHeaders("a", "b", "uuid", "dev", "")
+	if err != nil {
+		t.Fatalf("jsonHeaders: %v", err)
+	}
 	if h.Get("authorization") == "" {
 		t.Error("jsonHeaders should include base header authorization")
 	}
@@ -93,7 +120,10 @@ func TestJsonHeaders_includesBaseHeaders(t *testing.T) {
 }
 
 func TestUploadHeaders_noContentType(t *testing.T) {
-	h := uploadHeaders("a", "b", "uuid", "dev", "")
+	h, err := uploadHeaders("a", "b", "uuid", "dev", "")
+	if err != nil {
+		t.Fatalf("uploadHeaders: %v", err)
+	}
 	ct := h.Get("content-type")
 	if ct != "" {
 		t.Errorf("uploadHeaders should not set content-type, got %q", ct)
@@ -101,21 +131,30 @@ func TestUploadHeaders_noContentType(t *testing.T) {
 }
 
 func TestUploadHeaders_includesBaseHeaders(t *testing.T) {
-	h := uploadHeaders("a", "b", "uuid", "dev", "")
+	h, err := uploadHeaders("a", "b", "uuid", "dev", "")
+	if err != nil {
+		t.Fatalf("uploadHeaders: %v", err)
+	}
 	if h.Get("authorization") == "" {
 		t.Error("uploadHeaders should include base header authorization")
 	}
 }
 
 func TestCreateTransactionID_length(t *testing.T) {
-	id := createTransactionID()
+	id, err := createTransactionID()
+	if err != nil {
+		t.Fatalf("createTransactionID: %v", err)
+	}
 	if len(id) != 32 {
 		t.Errorf("createTransactionID: want 32 hex chars, got %d: %q", len(id), id)
 	}
 }
 
 func TestCreateTransactionID_hexChars(t *testing.T) {
-	id := createTransactionID()
+	id, err := createTransactionID()
+	if err != nil {
+		t.Fatalf("createTransactionID: %v", err)
+	}
 	for _, c := range id {
 		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			t.Errorf("createTransactionID: non-hex char %q in %q", string(c), id)
@@ -126,7 +165,10 @@ func TestCreateTransactionID_hexChars(t *testing.T) {
 
 func TestClientGetJSONHeaders(t *testing.T) {
 	c := New("tok", "csrf", nil)
-	h := c.getJSONHeaders()
+	h, err := c.getJSONHeaders()
+	if err != nil {
+		t.Fatalf("getJSONHeaders: %v", err)
+	}
 	if h.Get("content-type") != "application/json" {
 		t.Error("getJSONHeaders should set content-type to application/json")
 	}
@@ -137,7 +179,10 @@ func TestClientGetJSONHeaders(t *testing.T) {
 
 func TestClientGetBaseHeaders(t *testing.T) {
 	c := New("tok", "csrf", nil)
-	h := c.getBaseHeaders()
+	h, err := c.getBaseHeaders()
+	if err != nil {
+		t.Fatalf("getBaseHeaders: %v", err)
+	}
 	if h.Get("content-type") != "" {
 		t.Error("getBaseHeaders should not set content-type")
 	}
@@ -148,14 +193,20 @@ func TestClientGetBaseHeaders(t *testing.T) {
 
 func TestClientGetUploadHeaders(t *testing.T) {
 	c := New("tok", "csrf", nil)
-	h := c.getUploadHeaders()
+	h, err := c.getUploadHeaders()
+	if err != nil {
+		t.Fatalf("getUploadHeaders: %v", err)
+	}
 	if h.Get("content-type") != "" {
 		t.Error("getUploadHeaders should not set content-type")
 	}
 }
 
 func TestBaseHeaders_allEmpty(t *testing.T) {
-	h := baseHeaders("", "", "", "", "")
+	h, err := baseHeaders("", "", "", "", "")
+	if err != nil {
+		t.Fatalf("baseHeaders: %v", err)
+	}
 	if h.Get("cookie") != "auth_token=; ct0=" {
 		t.Errorf("cookie: got %q", h.Get("cookie"))
 	}

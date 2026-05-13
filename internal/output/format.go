@@ -50,8 +50,8 @@ func FormatUser(u types.TwitterUser, opts FormatOptions) string {
 			verified = " [verified]"
 		}
 	}
-	return fmt.Sprintf("%s@%s (%s) - followers: %s, following: %d%s",
-		prefix, u.Username, u.Name, formatCount(u.FollowersCount), u.FollowingCount, verified)
+	return fmt.Sprintf("%s@%s (%s) - followers: %s, following: %s%s",
+		prefix, u.Username, u.Name, formatCount(u.FollowersCount), formatCount(u.FollowingCount), verified)
 }
 
 // formatCount returns a human-readable representation of a large count.

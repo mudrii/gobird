@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 Release versions use the `YY.MM.DD` format.
 
+## [26.05.13] - 2026-05-13
+
+### Added
+- `Options.Logger` accepts an optional `*slog.Logger` for diagnostic events from `refreshQueryIDs`, scrape failures, and retry decisions. When nil, events are discarded.
+- `refreshQueryIDs` and `ensureClientUserID` now coalesce concurrent callers via `golang.org/x/sync/singleflight`, so a stampede of HTTP 404 responses or a cold-start user-ID lookup fires at most one in-flight call.
+- `scrapeQueryIDs` enforces a 30-second internal deadline and exits early once every known operation has a fresh ID.
+- Regression tests for snowflake-ID precision, Chrome cookie path traversal, media poll-delay floor, news-tab parser, refresh coalescing, and slog wiring.
+
+### Changed
+- Maximum response body size lowered from 100 MiB to 32 MiB to reduce memory-DoS surface; Twitter/X responses are typically <2 MiB.
+- `tryStatusUpdateFallback` parses the v1.1 `statuses/update.json` response with `json.Number` to preserve full snowflake-ID precision (>= 2^53).
+- Chrome cookie profile-path containment check now uses `filepath.Rel` instead of `strings.HasPrefix(path, parent+separator)` to reject directory-traversal inputs.
+- Chrome cookie key derivation now uses stdlib `crypto/pbkdf2` (Go 1.24+); the hand-rolled `pbkdf2SHA1` is retained as a thin wrapper for tests.
+- `FormatUser` renders the `following` count through `formatCount`, matching the existing treatment of `followers`.
+- Dedup `seen` maps in pagination, follow/list/news/tweet-detail/timeline parsers switched from `map[string]bool` to `map[string]struct{}` for consistency and lower GC pressure.
+- Retry/backoff jitter now uses `math/rand/v2` instead of `crypto/rand`; backoff doubling uses a left-shift instead of a loop.
+- `home.go` retry predicate dropped a redundant `strings.Contains` arm that overlapped with the `isQueryUnspecifiedError` regex.
+- Golden help fixture synced with the current root command flag set (`--dry-run`, `--quiet`, `--rate-limit`).
+
+### Fixed
+- Five `Client.doGET` call sites in `user_lookup.go`, `user_tweets.go`, and `users.go` now propagate the error returned by `getJSONHeaders()` instead of dropping it. This unblocks `go build`, `go vet`, and `golangci-lint` on the previous WIP state.
+- `mediaPollStatus` now honors any positive `check_after_secs` value from the server; previously values below 1 second fell back to the 2-second default.
+- `refreshQueryIDs` no longer silently swallows scrape outcomes; a warn-level event is emitted when no usable IDs were produced.
+
+### Dependencies
+- Promoted `golang.org/x/sync v0.17.0` from indirect to direct (used for `singleflight`).
+
 ## [26.04.08] - 2026-04-08
 
 ### Changed

@@ -33,7 +33,7 @@ jobs:
         run: go test -race ./...
 
       - name: Lint
-        uses: golangci/golangci-lint-action@4afd733a84b2f1a21c8ce386a6d40a76e2a09924 # v7.0.0
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
 
       - name: Build
         run: |

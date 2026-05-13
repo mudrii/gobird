@@ -12,14 +12,17 @@ import (
 // queryIDFormatRe validates scraped query IDs: 20+ alphanumeric/dash/underscore chars.
 var queryIDFormatRe = regexp.MustCompile(`^[A-Za-z0-9_-]{20,}$`)
 
-func scrapeBody(ctx context.Context, client *http.Client, url string) ([]byte, error) {
+func (c *Client) scrapeBody(ctx context.Context, url string) ([]byte, error) {
+	if err := c.waitForRateLimit(ctx); err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("user-agent", UserAgent)
 
-	resp, err := client.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -89,28 +92,42 @@ func (c *Client) AllQueryIDs(operation string) []string {
 }
 
 // refreshQueryIDs scrapes fresh query IDs from the X.com bundle and updates
-// the in-memory cache. Errors are silently ignored to preserve availability.
+// the in-memory cache. Errors are logged via c.logger but never returned, to
+// preserve availability. Concurrent callers are coalesced via singleflight.
 func (c *Client) refreshQueryIDs(ctx context.Context) {
-	scraper := c.scraper
-	if scraper == nil {
-		scraper = scrapeQueryIDs
-	}
-	refreshed := scraper(ctx)
-
-	c.queryIDMu.Lock()
-	defer c.queryIDMu.Unlock()
-
-	merged := make(map[string]string, len(BundledBaselineQueryIDs)+len(c.queryIDCache)+len(refreshed))
-	maps.Copy(merged, BundledBaselineQueryIDs)
-	maps.Copy(merged, c.queryIDCache)
-	for op, id := range refreshed {
-		if id != "" && queryIDFormatRe.MatchString(id) {
-			merged[op] = id
+	_, _, _ = c.refreshSF.Do("refresh", func() (any, error) {
+		var refreshed map[string]string
+		if c.scraper != nil {
+			refreshed = c.scraper(ctx)
+		} else {
+			refreshed = c.scrapeQueryIDs(ctx)
 		}
-	}
 
-	c.queryIDCache = merged
-	c.queryIDRefreshAt = time.Now()
+		c.queryIDMu.Lock()
+		defer c.queryIDMu.Unlock()
+
+		merged := make(map[string]string, len(BundledBaselineQueryIDs)+len(c.queryIDCache)+len(refreshed))
+		maps.Copy(merged, BundledBaselineQueryIDs)
+		maps.Copy(merged, c.queryIDCache)
+		added := 0
+		for op, id := range refreshed {
+			if id != "" && queryIDFormatRe.MatchString(id) {
+				merged[op] = id
+				added++
+			}
+		}
+
+		c.queryIDCache = merged
+		c.queryIDRefreshAt = time.Now()
+		if added == 0 {
+			c.logger.WarnContext(ctx, "refreshQueryIDs produced no new query IDs",
+				"scraped", len(refreshed))
+		} else {
+			c.logger.DebugContext(ctx, "refreshQueryIDs updated cache",
+				"added", added, "scraped", len(refreshed))
+		}
+		return nil, nil
+	})
 }
 
 // RefreshQueryIDs refreshes runtime query IDs from the X.com bundle.
@@ -118,7 +135,11 @@ func (c *Client) RefreshQueryIDs(ctx context.Context) {
 	c.refreshQueryIDs(ctx)
 }
 
-func scrapeQueryIDs(ctx context.Context) map[string]string {
+func (c *Client) scrapeQueryIDs(ctx context.Context) map[string]string {
+	// Cap total scrape time so a hanging upstream can't pin the refresh forever.
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	pages := []string{
 		"https://x.com/home",
 		"https://x.com/i/bookmarks",
@@ -135,22 +156,29 @@ func scrapeQueryIDs(ctx context.Context) map[string]string {
 	}
 
 	found := map[string]string{}
-	client := &http.Client{Timeout: 15 * time.Second}
-	visitedScripts := map[string]bool{}
+	visitedScripts := map[string]struct{}{}
 
 	for _, pageURL := range pages {
-		body, err := scrapeBody(ctx, client, pageURL)
+		if ctx.Err() != nil {
+			break
+		}
+		body, err := c.scrapeBody(ctx, pageURL)
 		if err != nil {
+			c.logger.DebugContext(ctx, "scrape page failed", "url", pageURL, "err", err)
 			continue
 		}
 		for _, scriptURL := range scriptRe.FindAllString(string(body), -1) {
-			if visitedScripts[scriptURL] {
+			if _, dup := visitedScripts[scriptURL]; dup {
 				continue
 			}
-			visitedScripts[scriptURL] = true
+			visitedScripts[scriptURL] = struct{}{}
 
-			scriptBody, err := scrapeBody(ctx, client, scriptURL)
+			if ctx.Err() != nil {
+				return found
+			}
+			scriptBody, err := c.scrapeBody(ctx, scriptURL)
 			if err != nil {
+				c.logger.DebugContext(ctx, "scrape script failed", "url", scriptURL, "err", err)
 				continue
 			}
 			script := string(scriptBody)
@@ -161,6 +189,10 @@ func scrapeQueryIDs(ctx context.Context) map[string]string {
 				if m := opRe.FindStringSubmatch(script); len(m) > 1 {
 					found[operation] = m[1]
 				}
+			}
+			// Early exit once every known operation has a fresh ID.
+			if len(found) >= len(operationREs) {
+				return found
 			}
 		}
 	}

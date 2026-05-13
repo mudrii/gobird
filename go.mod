@@ -9,6 +9,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20
 	github.com/spf13/cobra v1.10.2
 	github.com/tailscale/hujson v0.0.0-20260302212456-ecc657c15afd
+	golang.org/x/sync v0.17.0
 	modernc.org/sqlite v1.46.1
 )
 

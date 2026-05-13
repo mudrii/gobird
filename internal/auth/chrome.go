@@ -5,10 +5,10 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
+	"crypto/pbkdf2"
 	"crypto/sha1"
 	"crypto/sha256"
 	"database/sql"
-	"encoding/binary"
 	"fmt"
 	"os"
 	"os/exec"
@@ -177,7 +177,12 @@ func defaultChromeKeychainPasswordLookup(ctx context.Context) (string, error) {
 func chromeCookieKeyFromPassword(password string) []byte {
 	// Chrome derives a 128-bit (16-byte) AES key using PBKDF2-SHA1 with
 	// 1003 iterations and the fixed salt "saltysalt".
-	return pbkdf2SHA1([]byte(password), []byte("saltysalt"), 1003, 16)
+	key, err := pbkdf2.Key(sha1.New, password, []byte("saltysalt"), 1003, 16)
+	if err != nil {
+		// stdlib pbkdf2.Key only errors on invalid keyLen; 16 is valid.
+		panic(fmt.Sprintf("pbkdf2: %v", err))
+	}
+	return key
 }
 
 // decryptChromeCookie decrypts a Chrome-encrypted cookie value.
@@ -223,39 +228,33 @@ func decryptChromeCookie(host string, enc []byte, key []byte) (string, error) {
 	return string(plaintext), nil
 }
 
-// pbkdf2SHA1 implements PBKDF2 with HMAC-SHA1 (RFC 2898) using only stdlib.
-// Returns keyLen bytes. Supports up to 20*255 output bytes (SHA1 block = 20 bytes).
+// pbkdf2SHA1 wraps stdlib pbkdf2.Key with HMAC-SHA1. Retained for test use.
 func pbkdf2SHA1(password, salt []byte, iter, keyLen int) []byte {
-	prf := func(data []byte) []byte {
-		h := hmac.New(sha1.New, password)
-		h.Write(data)
-		return h.Sum(nil)
+	key, err := pbkdf2.Key(sha1.New, string(password), salt, iter, keyLen)
+	if err != nil {
+		panic(fmt.Sprintf("pbkdf2: %v", err))
 	}
-	result := make([]byte, 0, keyLen)
-	for block := uint32(1); len(result) < keyLen; block++ {
-		// U1 = PRF(password, salt || INT(block))
-		s := make([]byte, len(salt)+4)
-		copy(s, salt)
-		binary.BigEndian.PutUint32(s[len(salt):], block)
-		u := prf(s)
-		xored := make([]byte, len(u))
-		copy(xored, u)
-		for i := 1; i < iter; i++ {
-			u = prf(u)
-			for j := range xored {
-				xored[j] ^= u[j]
-			}
-		}
-		result = append(result, xored...)
-	}
-	return result[:keyLen]
+	return key
 }
 
 func isUnderAllowedParent(path string, parents []string) bool {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
 	for _, p := range parents {
-		if strings.HasPrefix(path, p+string(filepath.Separator)) {
-			return true
+		parentAbs, err := filepath.Abs(p)
+		if err != nil {
+			continue
 		}
+		rel, err := filepath.Rel(parentAbs, abs)
+		if err != nil {
+			continue
+		}
+		if rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
+			continue
+		}
+		return true
 	}
 	return false
 }

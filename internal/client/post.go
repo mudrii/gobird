@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"strconv"
 )
 
 // Tweet posts a new tweet with the given text and returns the tweet ID.
@@ -32,7 +31,10 @@ func (c *Client) ReplyWithMedia(ctx context.Context, text, inReplyToID string, m
 func (c *Client) createTweet(ctx context.Context, text, inReplyToID string, mediaIDs []string) (string, error) {
 	queryID := c.getQueryID("CreateTweet")
 	body := buildCreateTweetBody(text, inReplyToID, mediaIDs, queryID)
-	headers := c.getJSONHeaders()
+	headers, err := c.getJSONHeaders()
+	if err != nil {
+		return "", err
+	}
 	headers.Set("referer", "https://x.com/compose/post")
 
 	// Attempt 1: POST /graphql/<queryId>/CreateTweet
@@ -44,15 +46,11 @@ func (c *Client) createTweet(ctx context.Context, text, inReplyToID string, medi
 		body = buildCreateTweetBody(text, inReplyToID, mediaIDs, queryID)
 
 		respBody, err = c.doPOSTJSON(ctx, graphqlURL("CreateTweet", queryID), headers, body)
-		if err != nil && is404(err) {
-			// Attempt 3: POST https://x.com/i/api/graphql (same body with queryId)
-			respBody, err = c.doPOSTJSON(ctx, GraphQLBaseURL, headers, body)
-		}
 	}
 
 	// Check for error code 226 in any response that came back
 	if err == nil && respBody != nil {
-		errs := parseGraphQLErrors(respBody)
+		errs, _ := parseGraphQLErrors(respBody)
 		for _, e := range errs {
 			if e.Extensions.Code == "226" {
 				return c.tryStatusUpdateFallback(ctx, text, inReplyToID)
@@ -130,22 +128,28 @@ func (c *Client) tryStatusUpdateFallback(ctx context.Context, text, inReplyToID 
 		params.Set("auto_populate_reply_metadata", "true")
 	}
 
-	headers := c.getBaseHeaders()
+	headers, err := c.getBaseHeaders()
+	if err != nil {
+		return "", err
+	}
 	body, err := c.doPOSTForm(ctx, StatusUpdateURL, headers, params.Encode())
 	if err != nil {
 		return "", err
 	}
 
-	// Correction #40: prefer id_str, fallback to String(id).
-	var resp map[string]any
+	// Correction #40: prefer id_str, fallback to numeric id (preserve precision via json.Number).
+	var resp struct {
+		IDStr string      `json:"id_str"`
+		ID    json.Number `json:"id"`
+	}
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return "", fmt.Errorf("parse statuses/update response: %w", err)
 	}
-	if idStr, ok := resp["id_str"].(string); ok && idStr != "" {
-		return idStr, nil
+	if resp.IDStr != "" {
+		return resp.IDStr, nil
 	}
-	if idNum, ok := resp["id"].(float64); ok {
-		return strconv.FormatInt(int64(idNum), 10), nil
+	if s := resp.ID.String(); s != "" {
+		return s, nil
 	}
 	return "", fmt.Errorf("statuses/update: could not extract tweet ID")
 }

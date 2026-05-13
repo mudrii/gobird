@@ -260,7 +260,7 @@ One file per domain in `internal/client/`. Files are named after their primary c
 
 ## Mutex Discipline Rules
 
-The `Client` struct has three mutex-guarded state groups:
+The `Client` struct has three mutex-guarded state groups plus two `singleflight.Group` fields used to coalesce concurrent callers:
 
 ```go
 type Client struct {
@@ -274,6 +274,9 @@ type Client struct {
     rateMu sync.Mutex
     nextRequestAt time.Time
     minInterval time.Duration
+
+    refreshSF singleflight.Group // coalesces refreshQueryIDs callers
+    userIDSF  singleflight.Group // coalesces getCurrentUser cold-start callers
     // ...
 }
 ```
@@ -290,23 +293,31 @@ id := c.userID
 
 `cachedUserID()` acquires `userIDMu.RLock()` and releases it. The pattern exists because the user ID is resolved lazily and may be written by `ensureClientUserID()` concurrently.
 
-**Rule 2: Never hold the write lock while making HTTP calls.** The pattern in `ensureClientUserID` is:
+**Rule 2: Never hold the write lock while making HTTP calls.** The pattern in `ensureClientUserID` wraps the HTTP call in `c.userIDSF.Do("currentUser", ...)`. Inside the callback, the cache is first re-read under a read lock, then the HTTP call runs with no lock held, then the result is committed under a write lock:
 
 ```go
-// Slow path: resolve WITHOUT holding lock
-user, err := c.getCurrentUser(ctx)  // HTTP call, no lock held
-if err != nil {
-    return err
-}
-// Write lock acquired only to store result
-c.userIDMu.Lock()
-if c.userID == "" {
-    c.userID = user.ID
-}
-c.userIDMu.Unlock()
+_, err, _ := c.userIDSF.Do("currentUser", func() (any, error) {
+    c.userIDMu.RLock()
+    if c.userID != "" {
+        c.userIDMu.RUnlock()
+        return nil, nil
+    }
+    c.userIDMu.RUnlock()
+
+    user, err := c.getCurrentUser(ctx) // HTTP call, no lock held
+    if err != nil {
+        return nil, err
+    }
+    c.userIDMu.Lock()
+    if c.userID == "" {
+        c.userID = user.ID
+    }
+    c.userIDMu.Unlock()
+    return nil, nil
+})
 ```
 
-**Rule 3: `refreshQueryIDs` holds `queryIDMu.Lock()` only during the map write, not during the scrape.** The scraper runs without any lock held.
+**Rule 3: `refreshQueryIDs` is wrapped in `c.refreshSF.Do("refresh", ...)`** so a stampede of concurrent callers fires a single scrape. Inside the callback, `queryIDMu.Lock()` is held only during the final map write — never during the scrape itself. The scrape is bounded by an internal 30-second deadline and exits early once every known operation has a fresh ID.
 
 **Rule 4: Never read or write `c.nextRequestAt` outside `waitForRateLimit`.** Slot reservation and conditional rollback must happen under `rateMu` or the global throttle will become racy under concurrency.
 

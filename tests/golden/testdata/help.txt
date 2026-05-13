@@ -44,6 +44,7 @@ Flags:
       --cookie-timeout int          Cookie extraction timeout in ms
   -n, --count int                   Maximum number of items to fetch
       --ct0 string                  Twitter ct0 cookie value
+      --dry-run                     Preview write operations without making API calls
       --firefox-profile string      Firefox profile name
   -h, --help                        help for gobird
       --json                        Output as JSON
@@ -53,7 +54,9 @@ Flags:
       --no-color                    Disable ANSI color
       --no-emoji                    Disable emoji
       --plain                       Plain text output
+  -q, --quiet                       Suppress the startup warning
       --quote-depth int             Quoted tweet expansion depth (default -1)
+      --rate-limit float            Maximum requests per second (default 1)
       --timeout int                 HTTP request timeout in ms
       --version                     Print version information
 
